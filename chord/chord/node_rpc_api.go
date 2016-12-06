@@ -21,6 +21,17 @@ type IdReply struct {
 	Valid bool
 }
 
+type KeyValueReq struct {
+	NodeId []byte
+	Key    string
+	Value  string
+}
+
+type KeyValueReply struct {
+	Key   string
+	Value string
+}
+
 /* RPC connection map cache */
 var connMap = make(map[string]*rpc.Client)
 
@@ -73,4 +84,30 @@ func GetSuccessorId_RPC(remoteNode *RemoteNode) (*RemoteNode, error) {
 	rNode.Id = reply.Id
 	rNode.Addr = reply.Addr
 	return rNode, err
+}
+
+/* Get a value from a remote node's datastore for a given key */
+func Get_RPC(locNode *RemoteNode, key string) (string, error) {
+	if locNode == nil {
+		return "", errors.New("RemoteNode is empty!")
+	}
+
+	var reply KeyValueReply
+	req := KeyValueReq{locNode.Id, key, ""}
+	err := makeRemoteCall(locNode, "GetLocal", &req, &reply)
+
+	return reply.Value, err
+}
+
+/* Put a key/value into a datastore on a remote node */
+func Put_RPC(locNode *RemoteNode, key string, value string) error {
+	if locNode == nil {
+		return errors.New("RemoteNode is empty!")
+	}
+
+	var reply KeyValueReply
+	req := KeyValueReq{locNode.Id, key, value}
+	err := makeRemoteCall(locNode, "PutLocal", &req, &reply)
+
+	return err
 }
