@@ -37,6 +37,16 @@ type Node struct {
 	dsLock      sync.RWMutex      /* RWLock for datastore */
 }
 
+/* Creates a Chord node with a pre-defined ID (useful for testing) */
+func CreateDefinedNode(parent *RemoteNode, definedId []byte) (*Node, error) {
+	node := new(Node)
+	err := node.init(parent, definedId)
+	if err != nil {
+		return nil, err
+	}
+	return node, err
+}
+
 /* Create Chord node with random ID based on listener address */
 func CreateNode(parent *RemoteNode) (*Node, error) {
 	node := new(Node)
