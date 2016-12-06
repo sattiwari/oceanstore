@@ -5,6 +5,7 @@ package chord
 import (
 	"time"
 	"math/big"
+	"log"
 )
 
 /* A single finger table entry */
@@ -31,7 +32,20 @@ func (node *Node) initFingerTable() {
 /* Called periodically (in a seperate go routine) to fix entries in our finger table. */
 func (node *Node) fixNextFinger(ticker *time.Ticker) {
 	for _ = range ticker.C {
-		//TODO implement this method
+		for _ = range ticker.C {
+			next_hash := fingerMath(node.Id, node.next, KEY_LENGTH)
+			successor, err := node.findSuccessor(next_hash)
+			if err != nil {
+				log.Fatal(err)
+			}
+			node.ftLock.Lock()
+			node.FingerTable[node.next].Node = successor
+			node.ftLock.Unlock()
+			node.next += 1
+			if node.next >= KEY_LENGTH {
+				node.next = 1
+			}
+		}
 	}
 }
 

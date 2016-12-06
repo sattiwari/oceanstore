@@ -35,6 +35,7 @@ type Node struct {
 	ftLock      sync.RWMutex      /* RWLock for finger table */
 	dataStore   map[string]string /* Local datastore for this node */
 	dsLock      sync.RWMutex      /* RWLock for datastore */
+	next        int
 }
 
 /* Creates a Chord node with a pre-defined ID (useful for testing) */
@@ -77,6 +78,7 @@ func (node *Node) init(parent *RemoteNode, definedId []byte) error {
 	node.Addr = listener.Addr().String()
 	node.IsShutdown = false
 	node.dataStore = make(map[string]string)
+	node.next = 1
 
 	// Populate RemoteNode that points to self
 	node.RemoteSelf = new(RemoteNode)

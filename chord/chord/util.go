@@ -75,3 +75,27 @@ func CreateNNodes(n int) ([]*Node, error) {
 
 	return nodes, nil
 }
+
+/* Is X between (A : B] */
+func BetweenRightIncl(nodeX, nodeA, nodeB []byte) bool {
+
+	xInt := big.Int{}
+	xInt.SetBytes(nodeX)
+
+	aInt := big.Int{}
+	aInt.SetBytes(nodeA)
+
+	bInt := big.Int{}
+	bInt.SetBytes(nodeB)
+
+	var result bool
+	if aInt.Cmp(&bInt) == 0 {
+		result = true
+	} else if aInt.Cmp(&bInt) < 0 {
+		result = (xInt.Cmp(&aInt) == 1 && xInt.Cmp(&bInt) <= 0)
+	} else {
+		result = !(xInt.Cmp(&bInt) == 1 && xInt.Cmp(&aInt) <= 0)
+	}
+
+	return result
+}
