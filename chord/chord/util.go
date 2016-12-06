@@ -5,6 +5,7 @@ package chord
 import (
 	"crypto/sha1"
 	"math/big"
+	"bytes"
 )
 
 /* Hash a string to its appropriate size */
@@ -44,4 +45,8 @@ func Between(nodeX, nodeA, nodeB []byte) bool {
 	}
 
 	return result
+}
+
+func EqualIds(a, b []byte) bool {
+	return bytes.Equal(a, b)
 }
