@@ -50,3 +50,28 @@ func Between(nodeX, nodeA, nodeB []byte) bool {
 func EqualIds(a, b []byte) bool {
 	return bytes.Equal(a, b)
 }
+
+func CreateNNodes(n int) ([]*Node, error) {
+	if n == 0 {
+		return nil, nil
+	}
+	nodes := make([]*Node, n)
+
+	id := []byte{byte(0)}
+	curr, err := CreateDefinedNode(nil, id)
+	nodes[0] = curr
+	if err != nil {
+		return nil, err
+	}
+
+	for i := 1; i < n; i++ {
+		id := []byte{byte(i * 10)}
+		curr, err := CreateDefinedNode(nodes[0].RemoteSelf, id)
+		nodes[i] = curr
+		if err != nil {
+			return nil, err
+		}
+	}
+
+	return nodes, nil
+}
