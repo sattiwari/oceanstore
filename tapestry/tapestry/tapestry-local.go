@@ -1,11 +1,5 @@
 package tapestry
 
-import (
-	//	"errors"
-	"fmt"
-	"time"
-)
-
 /*
    Implementation of the local tapestry node.  There are three kinds of methods defined in this file
        1.  Methods that can be invoked remotely via RPC by other Tapestry nodes (eg AddBackpointer, RemoveBackpointer)
