@@ -38,3 +38,94 @@ func NewRoutingTable(me Node) *RoutingTable {
 	return t
 }
 
+func GetFurthest(id ID, nodes []Node) int {
+	furthest := 0
+	for i := 1; i < SLOTSIZE; i++ {
+		if id.Closer(nodes[furthest].Id, nodes[i].Id) {
+			furthest = i
+		}
+	}
+	return furthest
+}
+
+/*
+	Adds the given node to the routing table
+	Returns true if the node did not previously exist in the table and was subsequently added
+	Returns the previous node in the table, if one was overwritten
+*/
+func (t *RoutingTable) Add(node Node) (added bool, previous *Node) {
+	t.mutex.Lock()
+
+	// Find table slot.
+	level := SharedPrefixLength(node.Id, t.local.Id)
+
+	if level == DIGITS {
+		added = false
+		t.mutex.Unlock()
+		return
+	}
+
+	// fmt.Printf("%v, %v\n", i, node.Id[i])
+	slot := t.rows[level][node.Id[level]]
+
+	// Check if it exists; if it does return false
+	for i := 0; i < len(*slot); i++ {
+		if SharedPrefixLength((*slot)[i].Id, node.Id) == DIGITS {
+			added = false
+			t.mutex.Unlock()
+			return
+		}
+	}
+
+	// Append new slot and make sure theres a 3 node maximum.
+
+	for i := 0; i <= level; i++ {
+		slot = t.rows[i][node.Id[i]]
+		*slot = append(*slot, node)
+		if len(*slot) > SLOTSIZE {
+			furthest := GetFurthest(t.local.Id, *slot)
+			previous = &(*slot)[furthest]
+			*slot = append((*slot)[:furthest], (*slot)[furthest+1:]...)
+		}
+	}
+
+	added = true
+	t.mutex.Unlock()
+	return
+}
+
+/*
+	Removes the specified node from the routing table, if it exists
+	Returns true if the node was in the table and was successfully removed
+*/
+func (t *RoutingTable) Remove(node Node) (wasRemoved bool) {
+	t.mutex.Lock()
+
+	// Get the table slot
+	level := SharedPrefixLength(node.Id, t.local.Id)
+	if level == DIGITS {
+		// Never delete youself on your own routing table.
+		wasRemoved = false
+		t.mutex.Unlock()
+		return
+	}
+
+	wasRemoved = false
+
+	for j := 0; j <= level; j++ {
+		slot := t.rows[j][node.Id[j]]
+
+		// Find and remove node
+		for i := 0; i < len(*slot); i++ {
+			if SharedPrefixLength((*slot)[i].Id, node.Id) == DIGITS {
+				*slot = append((*slot)[:i], (*slot)[i+1:]...) // This is remove in Go
+				wasRemoved = true
+			}
+		}
+	}
+
+	// Return false if node was not found.
+	t.mutex.Unlock()
+	return
+}
+
