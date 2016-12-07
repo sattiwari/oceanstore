@@ -11,8 +11,21 @@ import (
 
 // This node is trying to join an existing ring that a remote node is a part of (i.e., other)
 func (node *Node) join(other *RemoteNode) error {
-	return nil
-	//TODO implement this method
+	// Handle case of "other" being nil (first node on ring).
+	if other == nil {
+		return nil
+	}
+
+	node.Predecessor = nil
+	succ, err := FindSuccessor_RPC(other, node.Id)
+	if EqualIds(succ.Id, node.Id) {
+		return errors.New("node already exists")
+	}
+	node.ftLock.Lock()
+	node.Successor = succ
+	node.FingerTable[0].Node = succ
+	node.ftLock.Unlock()
+	return err
 }
 
 // Thread 2: Psuedocode from figure 7 of chord paper
@@ -24,7 +37,26 @@ func (node *Node) stabilize(ticker *time.Ticker) {
 			return
 		}
 
-		//TODO implement this method
+		pred, err := GetPredecessorId_RPC(node.Successor)
+
+		if err != nil {
+			log.Fatal("GetPredecessorId_RPC error: " + err.Error())
+		}
+
+		if pred != nil && BetweenRightIncl(pred.Id, node.Id, node.Successor.Id) {
+			node.ftLock.Lock()
+			node.Successor = pred
+			node.FingerTable[0].Node = pred
+			node.ftLock.Unlock()
+		}
+
+		// If you are your own successor, do not notify yourself.
+		if !EqualIds(node.Successor.Id, node.Id) {
+			err = Notify_RPC(node.Successor, node.RemoteSelf)
+			if err != nil {
+				log.Fatal("Notify_RPC error: " + err.Error())
+			}
+		}
 	}
 }
 

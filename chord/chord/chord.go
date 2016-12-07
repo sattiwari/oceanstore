@@ -85,14 +85,14 @@ func (node *Node) init(parent *RemoteNode, definedId []byte) error {
 	node.RemoteSelf.Id = node.Id
 	node.RemoteSelf.Addr = node.Addr
 
+	// Populate finger table
+	node.initFingerTable()
+
 	// Join this node to the same chord ring as parent
 	err = node.join(parent)
 	if err != nil {
 		return err
 	}
-
-	// Populate finger table
-	node.initFingerTable()
 
 	// Thread 1: start RPC server on this connection
 	rpc.RegisterName(node.Addr, node)

@@ -32,6 +32,30 @@ type KeyValueReply struct {
 	Value string
 }
 
+type RpcOkay struct {
+	Ok bool
+}
+
+type UpdateReq struct {
+	FromId     []byte
+	UpdateId   []byte
+	UpdateAddr string
+}
+
+type NotifyReq struct {
+	NodeId     []byte
+	NodeAddr   string
+	UpdateId   []byte
+	UpdateAddr string
+}
+
+type TransferReq struct {
+	NodeId   []byte
+	FromId   []byte
+	FromAddr string
+	PredId   []byte
+}
+
 /* RPC connection map cache */
 var connMap = make(map[string]*rpc.Client)
 
@@ -73,6 +97,24 @@ func makeRemoteCall(remoteNode *RemoteNode, method string, req interface{}, rsp 
 	return nil
 }
 
+/* Get the predecessor ID of a remote node */
+func GetPredecessorId_RPC(remoteNode *RemoteNode) (*RemoteNode, error) {
+	var reply IdReply
+	err := makeRemoteCall(remoteNode, "GetPredecessorId", RemoteId{remoteNode.Id}, &reply)
+	if err != nil {
+		return nil, err
+	}
+
+	if !reply.Valid {
+		return nil, err
+	}
+
+	rNode := new(RemoteNode)
+	rNode.Id = reply.Id
+	rNode.Addr = reply.Addr
+	return rNode, err
+}
+
 /* Get the successor ID of a remote node */
 func GetSuccessorId_RPC(remoteNode *RemoteNode) (*RemoteNode, error) {
 	var reply IdReply
@@ -108,6 +150,67 @@ func Put_RPC(locNode *RemoteNode, key string, value string) error {
 	var reply KeyValueReply
 	req := KeyValueReq{locNode.Id, key, value}
 	err := makeRemoteCall(locNode, "PutLocal", &req, &reply)
+
+	return err
+}
+
+/* Set the predecessor ID of a remote node */
+func SetPredecessorId_RPC(remoteNode, newPred *RemoteNode) error {
+	var reply RpcOkay
+	var req UpdateReq
+	req.FromId = remoteNode.Id
+	if newPred != nil {
+		req.UpdateId = newPred.Id
+		req.UpdateAddr = newPred.Addr
+	}
+
+	err := makeRemoteCall(remoteNode, "SetPredecessorId", &req, &reply)
+	if err != nil {
+		return err
+	}
+	if !reply.Ok {
+		return errors.New(fmt.Sprintf("RPC replied not valid from %v", remoteNode.Id))
+	}
+
+	return err
+}
+
+/* Set the successor ID of a remote node */
+func SetSuccessorId_RPC(remoteNode, newSucc *RemoteNode) error {
+	var reply RpcOkay
+	var req UpdateReq
+	req.FromId = remoteNode.Id
+	req.UpdateId = newSucc.Id
+	req.UpdateAddr = newSucc.Addr
+
+	err := makeRemoteCall(remoteNode, "SetSuccessorId", &req, &reply)
+	if err != nil {
+		return err
+	}
+	if !reply.Ok {
+		return errors.New(fmt.Sprintf("RPC replied not valid from %v", remoteNode.Id))
+	}
+
+	return err
+}
+
+/* Notify a remote node that we believe we are its predecessor */
+func Notify_RPC(remoteNode, us *RemoteNode) error {
+	if remoteNode == nil {
+		return errors.New("RemoteNode is empty!")
+	}
+	var reply RpcOkay
+	var req NotifyReq
+	req.NodeId = remoteNode.Id
+	req.NodeAddr = remoteNode.Addr
+	req.UpdateId = us.Id
+	req.UpdateAddr = us.Addr
+
+	// must send us and intended node
+	err := makeRemoteCall(remoteNode, "Notify", &req, &reply)
+	if !reply.Ok {
+		return errors.New(fmt.Sprintf("RPC replied not valid from %v", remoteNode.Id))
+	}
 
 	return err
 }

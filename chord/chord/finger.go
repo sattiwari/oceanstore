@@ -6,6 +6,7 @@ import (
 	"time"
 	"math/big"
 	"log"
+	"fmt"
 )
 
 /* A single finger table entry */
@@ -80,4 +81,13 @@ func fingerMath(n []byte, i int, m int) []byte {
 	}
 
 	return result.Bytes()
+}
+
+/* Print contents of a node's finger table */
+func PrintFingerTable(node *Node) {
+	fmt.Printf("[%v] FingerTable:\n", HashStr(node.Id))
+	for _, val := range node.FingerTable {
+		fmt.Printf("\t{start:%v\tnodeLoc:%v %v}\n",
+			HashStr(val.Start), HashStr(val.Node.Id), val.Node.Addr)
+	}
 }
