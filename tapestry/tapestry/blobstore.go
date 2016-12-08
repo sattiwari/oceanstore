@@ -45,3 +45,16 @@ func (bs *BlobStore) DeleteAll() {
 	// clear the map
 	bs.blobs = make(map[string]Blob)
 }
+
+/*
+	Remove the blob and unregister it
+*/
+func (bs *BlobStore) Delete(key string) bool {
+	// If a previous blob exists, unregister it
+	previous, exists := bs.blobs[key]
+	if exists {
+		previous.done <- true
+	}
+	delete(bs.blobs, key)
+	return exists
+}
