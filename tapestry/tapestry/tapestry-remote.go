@@ -18,6 +18,12 @@ func (tapestry *Tapestry) hello(address string) (rsp Node, err error) {
 }
 
 // Helper function to makes a remote call
+func makeRemoteNodeCall(remote Node, method string, req interface{}, rsp interface{}) error {
+	fmt.Printf("%v(%v)\n", method, req)
+	return makeRemoteCall(remote.Address, "TapestryRPCServer", method, req, rsp)
+}
+
+// Helper function to makes a remote call
 func makeRemoteCall(address string, structtype string, method string, req interface{}, rsp interface{}) error {
 	// Dial the server
 	client, err := rpc.Dial("tcp", address)
