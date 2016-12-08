@@ -15,6 +15,16 @@ type TapestryRPCServer struct {
 	rpc      *rpc.Server
 }
 
+type RegisterRequest struct {
+	To   Node
+	From Node
+	Key  string
+}
+
+type RegisterResponse struct {
+	IsRoot bool
+}
+
 /*
 	Creates the tapestry RPC server of a tapestry node.  The RPC server receives function invocations,
 	and proxies them to the tapestrynode implementations

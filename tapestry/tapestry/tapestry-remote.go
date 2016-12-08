@@ -42,3 +42,10 @@ func makeRemoteCall(address string, structtype string, method string, req interf
 
 	return nil
 }
+
+// Remote API: makes a remote call to the Register function
+func (tapestry *Tapestry) register(remote Node, replica Node, key string) (bool, error) {
+	var rsp RegisterResponse
+	err := makeRemoteNodeCall(remote, "Register", RegisterRequest{remote, replica, key}, &rsp)
+	return rsp.IsRoot, err
+}
