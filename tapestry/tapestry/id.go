@@ -5,6 +5,8 @@ import (
 	"math/big"
 	"bytes"
 	"fmt"
+	"crypto/sha1"
+	"time"
 )
 
 /*
@@ -23,7 +25,7 @@ type Digit uint8
 func RandomID() ID {
 	var id ID
 	for i := range id {
-		id[i] = Digit(rand.Intn(BASE))
+		id[i] = Digit(random.Intn(BASE))
 	}
 	return id
 }
@@ -149,8 +151,32 @@ func (id ID) String() string {
 }
 
 /*
+	Hashes the string to an ID
+*/
+func Hash(key string) (id ID) {
+	// Sha-hash the key
+	sha := sha1.New()
+	sha.Write([]byte(key))
+	hash := sha.Sum([]byte{})
+
+	// Store in an ID
+	for i := range id {
+		id[i] = Digit(hash[(i/2)%len(hash)])
+		if i%2 == 0 {
+			id[i] >>= 4
+		}
+		id[i] %= BASE
+	}
+
+	return id
+}
+
+/*
 	String representation of a digit is its hex value
 */
 func (digit Digit) String() string {
 	return fmt.Sprintf("%X", byte(digit))
 }
+
+// generate random node ID
+var random = rand.New(rand.NewSource(time.Now().UTC().UnixNano()))
