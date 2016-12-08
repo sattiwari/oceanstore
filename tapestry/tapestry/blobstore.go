@@ -33,3 +33,15 @@ func NewBlobStoreRPC(store *BlobStore) *BlobStoreRPC {
 	rpc.store = store
 	return rpc
 }
+
+/*
+   Remove all blobs and unregister them all
+*/
+func (bs *BlobStore) DeleteAll() {
+	// unregister every blob
+	for _, blob := range bs.blobs {
+		blob.done <- true
+	}
+	// clear the map
+	bs.blobs = make(map[string]Blob)
+}
