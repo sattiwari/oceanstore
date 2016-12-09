@@ -107,3 +107,31 @@ func (tapestry *Tapestry) Store(key string, value []byte) error {
 func (tapestry *Tapestry) Lookup(key string) ([]Node, error) {
 	return tapestry.local.Lookup(key)
 }
+
+/*
+	Lookup a key in the tapestry then fetch the corresponding blob from the remote blob store
+*/
+func (tapestry *Tapestry) Get(key string) ([]byte, error) {
+	// Lookup the key
+	replicas, err := tapestry.Lookup(key)
+	if err != nil {
+		return nil, err
+	}
+	if len(replicas) == 0 {
+		return nil, fmt.Errorf("No replicas returned for key %v", key)
+	}
+
+	// Contact replicas
+	var errs []error
+	for _, replica := range replicas {
+		blob, err := FetchRemoteBlob(replica, key)
+		if err != nil {
+			errs = append(errs, err)
+		}
+		if blob != nil {
+			return *blob, nil
+		}
+	}
+
+	return nil, fmt.Errorf("Error contacting replicas, %v: %v", replicas, errs)
+}
