@@ -129,3 +129,47 @@ func (t *RoutingTable) Remove(node Node) (wasRemoved bool) {
 	return
 }
 
+/*
+	Search the table for the closest next-hop node for the provided ID
+*/
+func (t *RoutingTable) GetNextHop(id ID) (node Node) {
+
+	t.mutex.Lock()
+
+	level := SharedPrefixLength(id, t.local.Id)
+	row := t.rows[level]
+	// fmt.Printf("%v: %v y %v\n", id, level, id[level])
+	col := id[level]
+	for len(*(row[col])) == 0 {
+		col = (col + 1) % BASE
+		// fmt.Printf("%v\n", col)
+	}
+	// fmt.Printf("%v\n", col)
+
+	if len(*(row[col])) == 1 {
+		node = (*(row[col]))[0]
+	} else if len(*(row[col])) == 2 {
+		if id.BetterChoice((*(row[col]))[0].Id, (*(row[col]))[1].Id) {
+			node = (*(row[col]))[0]
+		} else {
+			node = (*(row[col]))[1]
+		}
+	} else { // Consider optimization if its too slow
+		if id.BetterChoice((*(row[col]))[0].Id, (*(row[col]))[1].Id) &&
+			id.BetterChoice((*(row[col]))[0].Id, (*(row[col]))[2].Id) {
+			node = (*(row[col]))[0]
+		} else if id.BetterChoice((*(row[col]))[1].Id, (*(row[col]))[0].Id) &&
+			id.BetterChoice((*(row[col]))[1].Id, (*(row[col]))[2].Id) {
+			node = (*(row[col]))[1]
+		} else if id.BetterChoice((*(row[col]))[2].Id, (*(row[col]))[0].Id) &&
+			id.BetterChoice((*(row[col]))[2].Id, (*(row[col]))[1].Id) {
+			node = (*(row[col]))[2]
+		} else {
+			node = (*(row[col]))[0]
+		}
+	}
+
+	t.mutex.Unlock()
+
+	return
+}
