@@ -1,5 +1,7 @@
 package tapestry
 
+import "fmt"
+
 /*
    Implementation of the local tapestry node.  There are three kinds of methods defined in this file
        1.  Methods that can be invoked remotely via RPC by other Tapestry nodes (eg AddBackpointer, RemoveBackpointer)
@@ -59,5 +61,23 @@ func (local *TapestryNode) GetNextHop(id ID) (morehops bool, nexthop Node, err e
 	}
 
 	morehops = true
+	return
+}
+
+/*
+   This method is invoked over RPC by other Tapestry nodes.
+   The provided nodes are bad and we should discard them
+   *    Remove each node from our routing table
+   *    Remove each node from our set of backpointers
+*/
+func (local *TapestryNode) RemoveBadNodes(badnodes []Node) (err error) {
+	for _, badnode := range badnodes {
+		if local.table.Remove(badnode) {
+			fmt.Printf("Removed bad node %v\n", badnode)
+		}
+		if local.backpointers.Remove(badnode) {
+			fmt.Printf("Removed bad node backpointer %v\n", badnode)
+		}
+	}
 	return
 }
