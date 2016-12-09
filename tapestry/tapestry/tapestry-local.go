@@ -1,6 +1,9 @@
 package tapestry
 
-import "fmt"
+import (
+	"fmt"
+	"time"
+)
 
 /*
    Implementation of the local tapestry node.  There are three kinds of methods defined in this file
@@ -97,7 +100,7 @@ func (local *TapestryNode) findRoot(start Node, id ID) (Node, error) {
 	var err error
 	var hasNext bool
 
-	for { 
+	for {
 		prev = current
 		current = next
 		hasNext, next, err = local.tapestry.getNextHop(current, id)
@@ -120,4 +123,48 @@ func (local *TapestryNode) findRoot(start Node, id ID) (Node, error) {
 	}
 
 	return current, nil
+}
+
+/*
+   Client API.  Publishes the key to tapestry.
+   *    Route to the root node for the key
+   *    Register our local node on the root
+   *    Start periodically republishing the key
+   *    Return a channel for cancelling the publish
+*/
+func (local *TapestryNode) Publish(key string) (done chan bool, err error) {
+	done = make(chan bool)
+
+	root, err := local.findRoot(local.node, Hash(key))
+
+	// If is not root
+	for i := 0; i < RETRIES; i++ {
+		isRoot, err := local.tapestry.register(root, local.node, key)
+
+		if isRoot && err == nil {
+			break
+		}
+	}
+
+	//Periodically checking
+	go func() {
+		for {
+			select {
+			case <-done:
+				return
+			case <-time.After(REPUBLISH):
+				root, _ := local.findRoot(local.node, Hash(key))
+				local.tapestry.register(root, local.node, key)
+				for i := 0; i < RETRIES; i++ {
+					isRoot, err := local.tapestry.register(root, local.node, key)
+
+					if isRoot && err == nil {
+						break
+					}
+				}
+			}
+		}
+	}()
+
+	return done, err
 }
