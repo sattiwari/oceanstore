@@ -58,3 +58,14 @@ func (bs *BlobStore) Delete(key string) bool {
 	delete(bs.blobs, key)
 	return exists
 }
+
+/*
+	Store bytes in the blobstore
+*/
+func (bs *BlobStore) Put(key string, blob []byte, unregister chan bool) {
+	// If a previous blob exists, delete it
+	bs.Delete(key)
+
+	// Register the new one
+	bs.blobs[key] = Blob{blob, unregister}
+}
