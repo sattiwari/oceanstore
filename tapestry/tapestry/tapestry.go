@@ -100,3 +100,10 @@ func (tapestry *Tapestry) Store(key string, value []byte) error {
 	tapestry.blobstore.Put(key, value, done)
 	return nil
 }
+
+/*
+	Lookup a key in the tapestry and return its root node
+*/
+func (tapestry *Tapestry) Lookup(key string) ([]Node, error) {
+	return tapestry.local.Lookup(key)
+}
