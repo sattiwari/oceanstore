@@ -88,3 +88,15 @@ func start(id ID, port int, connectTo string) (tapestry *Tapestry, err error) {
 
 	return tapestry, nil
 }
+
+/*
+	Store a blob on the local node and publish the key to the tapestry
+*/
+func (tapestry *Tapestry) Store(key string, value []byte) error {
+	done, err := tapestry.local.Publish(key)
+	if err != nil {
+		return err
+	}
+	tapestry.blobstore.Put(key, value, done)
+	return nil
+}
