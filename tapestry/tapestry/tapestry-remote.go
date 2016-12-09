@@ -61,3 +61,10 @@ func (tapestry *Tapestry) getNextHop(remote Node, id ID) (bool, Node, error) {
 func (tapestry *Tapestry) removeBadNodes(remote Node, toremove []Node) error {
 	return makeRemoteNodeCall(remote, "RemoveBadNodes", RemoveBadNodesRequest{remote, toremove}, &Node{})
 }
+
+// Remote API: makes a remote call to the Fetch function
+func (tapestry *Tapestry) fetch(remote Node, key string) (bool, []Node, error) {
+	var rsp FetchResponse
+	err := makeRemoteNodeCall(remote, "Fetch", FetchRequest{remote, key}, &rsp)
+	return rsp.IsRoot, rsp.Values, err
+}

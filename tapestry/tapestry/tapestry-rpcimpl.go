@@ -39,6 +39,17 @@ type RemoveBadNodesRequest struct {
 	BadNodes []Node
 }
 
+type FetchRequest struct {
+	To  Node
+	Key string
+}
+type FetchResponse struct {
+	To     Node
+	IsRoot bool
+	Values []Node
+}
+
+
 /*
 	Creates the tapestry RPC server of a tapestry node.  The RPC server receives function invocations,
 	and proxies them to the tapestrynode implementations
@@ -92,4 +103,12 @@ func (server *TapestryRPCServer) RemoveBadNodes(req RemoveBadNodesRequest, rsp *
 		return err
 	}
 	return server.tapestry.local.RemoveBadNodes(req.BadNodes)
+}
+
+func (server *TapestryRPCServer) Fetch(req FetchRequest, rsp *FetchResponse) (err error) {
+	err = server.validate(req.To)
+	if err == nil {
+		rsp.IsRoot, rsp.Values, err = server.tapestry.local.Fetch(req.Key)
+	}
+	return
 }

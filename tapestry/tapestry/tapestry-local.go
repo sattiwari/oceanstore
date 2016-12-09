@@ -168,3 +168,20 @@ func (local *TapestryNode) Publish(key string) (done chan bool, err error) {
 
 	return done, err
 }
+
+/*
+   This method is invoked over RPC by other Tapestry nodes.
+   *    Check that we are the root node for the requested key
+   *    Return all nodes that are registered in the local object store for this key
+*/
+func (local *TapestryNode) Fetch(key string) (isRoot bool, replicas []Node, err error) {
+	root, _ := local.findRoot(local.node, Hash(key))
+	if !equal_ids(root.Id, local.node.Id) {
+		isRoot = false
+		return
+	}
+	isRoot = true
+
+	replicas = local.store.Get(key)
+	return
+}
