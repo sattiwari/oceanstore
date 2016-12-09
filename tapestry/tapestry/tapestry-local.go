@@ -41,3 +41,23 @@ func newTapestryNode(node Node, tapestry *Tapestry) *TapestryNode {
 	n.tapestry = tapestry
 	return n
 }
+
+/*
+   This method is invoked over RPC by other Tapestry nodes.
+   *    Returns the best candidate from our routing table for routing to the provided ID
+*/
+func (local *TapestryNode) GetNextHop(id ID) (morehops bool, nexthop Node, err error) {
+
+	// Call routingtable.go method
+	nexthop = local.table.GetNextHop(id)
+
+	// If all digits match (aka is equal), no more hops are needed.
+	sharedDigits := SharedPrefixLength(local.node.Id, nexthop.Id)
+	if DIGITS == sharedDigits {
+		morehops = false
+		return
+	}
+
+	morehops = true
+	return
+}
