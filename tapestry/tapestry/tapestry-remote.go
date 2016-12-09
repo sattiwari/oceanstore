@@ -56,3 +56,8 @@ func (tapestry *Tapestry) getNextHop(remote Node, id ID) (bool, Node, error) {
 	err := makeRemoteNodeCall(remote, "GetNextHop", NextHopRequest{remote, id}, &rsp)
 	return rsp.HasNext, rsp.Next, err
 }
+
+// Remote API: makes a remote call to the RemoveBadNodes function
+func (tapestry *Tapestry) removeBadNodes(remote Node, toremove []Node) error {
+	return makeRemoteNodeCall(remote, "RemoveBadNodes", RemoveBadNodesRequest{remote, toremove}, &Node{})
+}

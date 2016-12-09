@@ -33,6 +33,12 @@ type NextHopResponse struct {
 	HasNext bool
 	Next    Node
 }
+
+type RemoveBadNodesRequest struct {
+	To       Node
+	BadNodes []Node
+}
+
 /*
 	Creates the tapestry RPC server of a tapestry node.  The RPC server receives function invocations,
 	and proxies them to the tapestrynode implementations
@@ -77,4 +83,13 @@ func (server *TapestryRPCServer) GetNextHop(req NextHopRequest, rsp *NextHopResp
 		rsp.HasNext, rsp.Next, err = server.tapestry.local.GetNextHop(req.Id)
 	}
 	return
+}
+
+// Server: proxies a remote method invocation to the local node
+func (server *TapestryRPCServer) RemoveBadNodes(req RemoveBadNodesRequest, rsp *Node) error {
+	err := server.validate(req.To)
+	if err != nil {
+		return err
+	}
+	return server.tapestry.local.RemoveBadNodes(req.BadNodes)
 }
