@@ -81,3 +81,43 @@ func (local *TapestryNode) RemoveBadNodes(badnodes []Node) (err error) {
 	}
 	return
 }
+
+/*
+   Utility function for iteratively contacting nodes to get the root node for the provided ID
+   *    Starting from the specified node, iteratively contact nodes calling getNextHop until we reach the root node
+   *    Also keep track of any bad nodes that errored during lookup
+   *    At each step, notify the next-hop node of all of the bad nodes we have encountered along the way
+*/
+func (local *TapestryNode) findRoot(start Node, id ID) (Node, error) {
+	fmt.Printf("Routing to %v\n", id)
+
+	next := start
+	var current, prev Node
+	var badNodes []Node
+	var err error
+	var hasNext bool
+
+	for { 
+		prev = current
+		current = next
+		hasNext, next, err = local.tapestry.getNextHop(current, id)
+
+		if err != nil {
+			badNodes = append(badNodes, current)
+			current = prev
+		}
+
+		err = local.tapestry.removeBadNodes(current, badNodes)
+
+		// Current node does not exist anymore. Cannot recover.
+		if err != nil {
+			return current, err
+		}
+
+		if !hasNext {
+			break
+		}
+	}
+
+	return current, nil
+}
