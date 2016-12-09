@@ -185,3 +185,27 @@ func (local *TapestryNode) Fetch(key string) (isRoot bool, replicas []Node, err 
 	replicas = local.store.Get(key)
 	return
 }
+
+/*
+   Client API.  Look up the Tapestry nodes that are storing the blob for the specified key.
+   *    Find the root node for the key
+   *    Fetch the replicas from the root's object store
+   *    Attempt up to RETRIES many times
+*/
+func (local *TapestryNode) Lookup(key string) (nodes []Node, err error) {
+	for i := 0; i < RETRIES; i++ {
+		root, err := local.findRoot(local.node, Hash(key))
+		if err != nil {
+			continue
+		}
+
+		wasRoot, replicas, err := local.tapestry.fetch(root, key)
+
+		if wasRoot && err == nil {
+			nodes = replicas
+			break
+		}
+	}
+
+	return
+}
