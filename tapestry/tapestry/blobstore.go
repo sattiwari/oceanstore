@@ -69,3 +69,15 @@ func (bs *BlobStore) Put(key string, blob []byte, unregister chan bool) {
 	// Register the new one
 	bs.blobs[key] = Blob{blob, unregister}
 }
+
+/*
+	Get bytes from the blobstore
+*/
+func (bs *BlobStore) Get(key string) ([]byte, bool) {
+	blob, exists := bs.blobs[key]
+	if exists {
+		return blob.bytes, true
+	} else {
+		return nil, false
+	}
+}
