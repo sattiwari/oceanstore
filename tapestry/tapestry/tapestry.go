@@ -135,3 +135,10 @@ func (tapestry *Tapestry) Get(key string) ([]byte, error) {
 
 	return nil, fmt.Errorf("Error contacting replicas, %v: %v", replicas, errs)
 }
+
+/*
+	Remove the blob from the local blob store and stop advertising
+*/
+func (tapestry *Tapestry) Remove(key string) bool {
+	return tapestry.blobstore.Delete(key)
+}
