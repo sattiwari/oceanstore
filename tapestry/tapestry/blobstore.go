@@ -1,5 +1,7 @@
 package tapestry
 
+import "fmt"
+
 /*
 	This is a utility class tacked on to the tapestry DOLR.
 */
@@ -80,4 +82,13 @@ func (bs *BlobStore) Get(key string) ([]byte, bool) {
 	} else {
 		return nil, false
 	}
+}
+
+/*
+	Fetches the specified blob from the remote node
+*/
+func FetchRemoteBlob(remote Node, key string) (blob *[]byte, err error) {
+	fmt.Printf("FetchRemoteBlob %v %v", key, remote)
+	err = makeRemoteCall(remote.Address, "BlobStoreRPC", "Fetch", key, &blob)
+	return
 }
