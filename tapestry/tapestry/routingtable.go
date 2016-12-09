@@ -173,3 +173,24 @@ func (t *RoutingTable) GetNextHop(id ID) (node Node) {
 
 	return
 }
+
+/*
+	Get all nodes on the specified level of the routing table, EXCLUDING the local node
+*/
+func (t *RoutingTable) GetLevel(level int) (nodes []Node) {
+	t.mutex.Lock()
+	row := t.rows[level]
+	for i := 0; i < BASE; i++ {
+		if t.local.Id[level] == Digit(i) {
+			continue
+		}
+		for j := 0; j < len(*row[i]); j++ {
+			if SharedPrefixLength((*(row[i]))[j].Id, t.local.Id) != DIGITS {
+				nodes = append(nodes, (*(row[i]))[j]) // append node
+			}
+		}
+	}
+	t.mutex.Unlock()
+	return
+}
+
