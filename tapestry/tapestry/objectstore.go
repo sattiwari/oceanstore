@@ -23,3 +23,24 @@ func NewObjectStore() *ObjectStore {
 	m.data = make(map[string]map[Node]*time.Timer)
 	return m
 }
+
+/*
+	Get the nodes that are advertising a given key
+*/
+func (store *ObjectStore) Get(key string) (replicas []Node) {
+	store.mutex.Lock()
+
+	replicas = slice(store.data[key])
+
+	store.mutex.Unlock()
+
+	return
+}
+
+// Utility function to get the keys of a map
+func slice(valmap map[Node]*time.Timer) (values []Node) {
+	for value, _ := range valmap {
+		values = append(values, value)
+	}
+	return
+}
