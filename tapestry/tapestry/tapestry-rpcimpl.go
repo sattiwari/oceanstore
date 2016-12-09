@@ -25,6 +25,14 @@ type RegisterResponse struct {
 	IsRoot bool
 }
 
+type NextHopRequest struct {
+	To Node
+	Id ID
+}
+type NextHopResponse struct {
+	HasNext bool
+	Next    Node
+}
 /*
 	Creates the tapestry RPC server of a tapestry node.  The RPC server receives function invocations,
 	and proxies them to the tapestrynode implementations
@@ -53,5 +61,20 @@ func newTapestryRPCServer(port int, tapestry *Tapestry) (server *TapestryRPCServ
 		}
 	}()
 
+	return
+}
+
+func (server *TapestryRPCServer) validate(expect Node) error {
+	if server.tapestry.local.node != expect {
+		return fmt.Errorf("Remote node expected us to be %v, but we are %v", expect, server.tapestry.local.node)
+	}
+	return nil
+}
+
+func (server *TapestryRPCServer) GetNextHop(req NextHopRequest, rsp *NextHopResponse) (err error) {
+	err = server.validate(req.To)
+	if err == nil {
+		rsp.HasNext, rsp.Next, err = server.tapestry.local.GetNextHop(req.Id)
+	}
 	return
 }

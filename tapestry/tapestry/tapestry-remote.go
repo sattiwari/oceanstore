@@ -49,3 +49,10 @@ func (tapestry *Tapestry) register(remote Node, replica Node, key string) (bool,
 	err := makeRemoteNodeCall(remote, "Register", RegisterRequest{remote, replica, key}, &rsp)
 	return rsp.IsRoot, err
 }
+
+// Remote API: makes a remote call to the GetNextHop function
+func (tapestry *Tapestry) getNextHop(remote Node, id ID) (bool, Node, error) {
+	var rsp NextHopResponse
+	err := makeRemoteNodeCall(remote, "GetNextHop", NextHopRequest{remote, id}, &rsp)
+	return rsp.HasNext, rsp.Next, err
+}
