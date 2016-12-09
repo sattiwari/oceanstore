@@ -37,6 +37,28 @@ func (store *ObjectStore) Get(key string) (replicas []Node) {
 	return
 }
 
+/*
+	Removes and returns all objects that should be transferred to the remote node
+*/
+func (store *ObjectStore) GetTransferRegistrations(local Node, remote Node) map[string][]Node {
+	transfer := make(map[string][]Node)
+	store.mutex.Lock()
+
+	for key, values := range store.data {
+		// Compare the first digit after the prefix
+		if Hash(key).BetterChoice(remote.Id, local.Id) {
+			transfer[key] = slice(values)
+		}
+	}
+
+	for key, _ := range transfer {
+		delete(store.data, key)
+	}
+
+	store.mutex.Unlock()
+	return transfer
+}
+
 // Utility function to get the keys of a map
 func slice(valmap map[Node]*time.Timer) (values []Node) {
 	for value, _ := range valmap {
