@@ -3,6 +3,7 @@ package tapestry
 import (
 	"sync"
 	"time"
+	"fmt"
 )
 
 /*
@@ -58,6 +59,50 @@ func (store *ObjectStore) GetTransferRegistrations(local Node, remote Node) map[
 	store.mutex.Unlock()
 	return transfer
 }
+
+/*
+	Registers all of the provided nodes and keys.
+*/
+func (store *ObjectStore) RegisterAll(replicamap map[string][]Node, timeout time.Duration) {
+	store.mutex.Lock()
+
+	for key, replicas := range replicamap {
+		_, exists := store.data[key]
+		if !exists {
+			store.data[key] = make(map[Node]*time.Timer)
+		}
+		for _, replica := range replicas {
+			store.data[key][replica] = store.newTimeout(key, replica, timeout)
+		}
+	}
+
+	store.mutex.Unlock()
+}
+
+/*
+   Utility method. Creates an expiry timer for the (key, value) pair.
+*/
+func (store *ObjectStore) newTimeout(key string, replica Node, timeout time.Duration) *time.Timer {
+	expire := func() {
+		fmt.Printf("Expiring %v for node %v\n", key, replica)
+
+		store.mutex.Lock()
+
+		timer, exists := store.data[key][replica]
+		if exists {
+			timer.Stop()
+			delete(store.data[key], replica)
+			if len(store.data[key]) == 0 {
+				delete(store.data, key)
+			}
+		}
+
+		store.mutex.Unlock()
+	}
+
+	return time.AfterFunc(timeout, expire)
+}
+
 
 // Utility function to get the keys of a map
 func slice(valmap map[Node]*time.Timer) (values []Node) {
