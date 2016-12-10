@@ -100,3 +100,8 @@ func (tapestry *Tapestry) addNodeMulticast(remote Node, newnode Node, level int)
 func (tapestry *Tapestry) transfer(remote Node, from Node, data map[string][]Node) error {
 	return makeRemoteNodeCall(remote, "Transfer", TransferRequest{remote, from, data}, &Node{})
 }
+
+// Remote API: makes a remote call to the NotifyLeave function
+func (tapestry *Tapestry) notifyLeave(remote Node, from Node, replacement *Node) (err error) {
+	return makeRemoteNodeCall(remote, "NotifyLeave", NotifyLeaveRequest{remote, from, replacement}, &Node{})
+}

@@ -73,6 +73,12 @@ type AddNodeMulticastRequest struct {
 	Level   int
 }
 
+type NotifyLeaveRequest struct {
+	To          Node
+	From        Node
+	Replacement *Node
+}
+
 /*
 	Creates the tapestry RPC server of a tapestry node.  The RPC server receives function invocations,
 	and proxies them to the tapestrynode implementations
@@ -188,4 +194,12 @@ func (server *TapestryRPCServer) Transfer(req TransferRequest, rsp *Node) error 
 		return err
 	}
 	return server.tapestry.local.Transfer(req.From, req.Data)
+}
+
+func (server *TapestryRPCServer) NotifyLeave(req NotifyLeaveRequest, rsp *Node) error {
+	err := server.validate(req.To)
+	if err != nil {
+		return err
+	}
+	return server.tapestry.local.NotifyLeave(req.From, req.Replacement)
 }

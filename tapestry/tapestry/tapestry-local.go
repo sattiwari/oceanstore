@@ -387,3 +387,54 @@ func (local *TapestryNode) Join(otherNode Node) error {
 
 	return err
 }
+
+/*
+   This method is invoked over RPC by other Tapestry nodes.
+   Another node is informing us of a graceful exit.
+   *    Remove references to the from node from our routing table and backpointers
+   *    If replacement is not nil, add replacement to our routing table
+*/
+func (local *TapestryNode) NotifyLeave(from Node, replacement *Node) (err error) {
+	fmt.Printf("Received leave notification from %v with replacement node %v\n", from, replacement)
+
+	local.table.Remove(from)
+	local.RemoveBackpointer(from)
+
+	if replacement != nil {
+		err = local.addRoute(*replacement)
+	}
+	return
+}
+
+/*
+   Client API function to gracefully exit the Tapestry mesh
+   *    Notify the nodes in our backpointers that we are leaving by calling NotifyLeave
+   *    If possible, give each backpointer a suitable alternative node from our routing table
+*/
+func (local *TapestryNode) Leave() (err error) {
+	sets := local.backpointers.sets // [DIGITS]*NodeSet
+	for _, set := range sets {
+		set.mutex.Lock()
+		for node, _ := range set.data {
+			var row []Node
+			var err error
+
+			sharedDigits := SharedPrefixLength(local.node.Id, node.Id)
+			if sharedDigits < DIGITS-1 {
+				row = local.table.GetLevel(sharedDigits + 1)
+			}
+			if len(row) != 0 {
+				err = local.tapestry.notifyLeave(node, local.node, &row[0])
+			} else {
+				err = local.tapestry.notifyLeave(node, local.node, nil)
+			}
+
+			// Could not notify
+			if err != nil {
+				continue
+			}
+		}
+		set.mutex.Unlock()
+	}
+	return
+}
