@@ -68,3 +68,35 @@ func (tapestry *Tapestry) fetch(remote Node, key string) (bool, []Node, error) {
 	err := makeRemoteNodeCall(remote, "Fetch", FetchRequest{remote, key}, &rsp)
 	return rsp.IsRoot, rsp.Values, err
 }
+
+// Remote API: makes a remote call to the AddBackpointer function
+func (tapestry *Tapestry) addBackpointer(remote Node, toAdd Node) error {
+	return makeRemoteNodeCall(remote, "AddBackpointer", NodeRequest{remote, toAdd}, &Node{})
+}
+
+// Remote API: makes a remote call to the RemoveBackpointer function
+func (tapestry *Tapestry) removeBackpointer(remote Node, toRemove Node) error {
+	return makeRemoteNodeCall(remote, "RemoveBackpointer", NodeRequest{remote, toRemove}, &Node{})
+}
+
+// Remote API: makes a remote call to the GetBackpointers function
+func (tapestry *Tapestry) getBackpointers(remote Node, from Node, level int) (neighbours []Node, err error) {
+	err = makeRemoteNodeCall(remote, "GetBackpointers", GetBackpointersRequest{remote, from, level}, &neighbours)
+	return
+}
+
+// Remote API: makes a remote call to the AddNode function
+func (tapestry *Tapestry) addNode(remote Node, newnode Node) (neighbours []Node, err error) {
+	err = makeRemoteNodeCall(remote, "AddNode", NodeRequest{remote, newnode}, &neighbours)
+	return
+}
+
+// Remote API: makes a remote call to the AddNodeMulticast function
+func (tapestry *Tapestry) addNodeMulticast(remote Node, newnode Node, level int) (neighbours []Node, err error) {
+	err = makeRemoteNodeCall(remote, "AddNodeMulticast", AddNodeMulticastRequest{remote, newnode, level}, &neighbours)
+	return
+}
+
+func (tapestry *Tapestry) transfer(remote Node, from Node, data map[string][]Node) error {
+	return makeRemoteNodeCall(remote, "Transfer", TransferRequest{remote, from, data}, &Node{})
+}

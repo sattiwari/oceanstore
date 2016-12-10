@@ -43,12 +43,35 @@ type FetchRequest struct {
 	To  Node
 	Key string
 }
+
 type FetchResponse struct {
 	To     Node
 	IsRoot bool
 	Values []Node
 }
 
+type GetBackpointersRequest struct {
+	To    Node
+	From  Node
+	Level int
+}
+
+type TransferRequest struct {
+	To   Node
+	From Node
+	Data map[string][]Node
+}
+
+type NodeRequest struct {
+	To   Node
+	Node Node
+}
+
+type AddNodeMulticastRequest struct {
+	To      Node
+	NewNode Node
+	Level   int
+}
 
 /*
 	Creates the tapestry RPC server of a tapestry node.  The RPC server receives function invocations,
@@ -111,4 +134,58 @@ func (server *TapestryRPCServer) Fetch(req FetchRequest, rsp *FetchResponse) (er
 		rsp.IsRoot, rsp.Values, err = server.tapestry.local.Fetch(req.Key)
 	}
 	return
+}
+
+func (server *TapestryRPCServer) AddBackpointer(req NodeRequest, rsp *Node) error {
+	err := server.validate(req.To)
+	if err != nil {
+		return err
+	}
+	return server.tapestry.local.AddBackpointer(req.Node)
+}
+
+func (server *TapestryRPCServer) RemoveBackpointer(req NodeRequest, rsp *Node) error {
+	err := server.validate(req.To)
+	if err != nil {
+		return err
+	}
+	return server.tapestry.local.RemoveBackpointer(req.Node)
+}
+
+func (server *TapestryRPCServer) GetBackpointers(req GetBackpointersRequest, rsp *[]Node) (err error) {
+	err = server.validate(req.To)
+	if err != nil {
+		return err
+	}
+	backpointers, err := server.tapestry.local.GetBackpointers(req.From, req.Level)
+	*rsp = append(*rsp, backpointers...)
+	return
+}
+
+func (server *TapestryRPCServer) AddNode(req NodeRequest, rsp *[]Node) (err error) {
+	err = server.validate(req.To)
+	if err != nil {
+		return
+	}
+	neighbours, err := server.tapestry.local.AddNode(req.Node)
+	*rsp = append(*rsp, neighbours...)
+	return
+}
+
+func (server *TapestryRPCServer) AddNodeMulticast(req AddNodeMulticastRequest, rsp *[]Node) (err error) {
+	err = server.validate(req.To)
+	if err != nil {
+		return err
+	}
+	neighbours, err := server.tapestry.local.AddNodeMulticast(req.NewNode, req.Level)
+	*rsp = append(*rsp, neighbours...)
+	return err
+}
+
+func (server *TapestryRPCServer) Transfer(req TransferRequest, rsp *Node) error {
+	err := server.validate(req.To)
+	if err != nil {
+		return err
+	}
+	return server.tapestry.local.Transfer(req.From, req.Data)
 }
