@@ -208,3 +208,19 @@ func (server *TapestryRPCServer) NotifyLeave(req NotifyLeaveRequest, rsp *Node) 
 	}
 	return server.tapestry.local.NotifyLeave(req.From, req.Replacement)
 }
+
+/*
+   This method is invoked over RPC by other Tapestry nodes.
+   Register the specified node as an advertiser of the specified key.
+
+   *    Check that we are the root node for the key
+   *    Add the node to the object store
+   *    Kick off a timer to remove the node if it's not advertised again after a set amount of time
+*/
+func (server *TapestryRPCServer) Register(req RegisterRequest, rsp *RegisterResponse) (err error) {
+	err = server.validate(req.To)
+	if err == nil {
+		rsp.IsRoot, err = server.tapestry.local.Register(req.Key, req.From)
+	}
+	return
+}

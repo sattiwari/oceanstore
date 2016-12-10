@@ -92,3 +92,14 @@ func FetchRemoteBlob(remote Node, key string) (blob *[]byte, err error) {
 	err = makeRemoteCall(remote.Address, "BlobStoreRPC", "Fetch", key, &blob)
 	return
 }
+
+/*
+   Invoked over RPC to fetch bytes from the blobstore
+*/
+func (rpc *BlobStoreRPC) Fetch(key string, blob *[]byte) error {
+	b, exists := rpc.store.blobs[key]
+	if exists {
+		*blob = b.bytes
+	}
+	return nil
+}

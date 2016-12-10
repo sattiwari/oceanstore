@@ -61,6 +61,31 @@ func (store *ObjectStore) GetTransferRegistrations(local Node, remote Node) map[
 }
 
 /*
+	Registers the specified node as having advertised the key.  Times out after the specified duration.
+*/
+func (store *ObjectStore) Register(key string, replica Node, timeout time.Duration) bool {
+	store.mutex.Lock()
+
+	// Get the value set for the object
+	_, exists := store.data[key]
+	if !exists {
+		store.data[key] = make(map[Node]*time.Timer)
+	}
+
+	// Add the value to the value set
+	timer, exists := store.data[key][replica]
+	if !exists {
+		store.data[key][replica] = store.newTimeout(key, replica, timeout)
+	} else {
+		timer.Reset(TIMEOUT)
+	}
+
+	store.mutex.Unlock()
+
+	return !exists
+}
+
+/*
 	Registers all of the provided nodes and keys.
 */
 func (store *ObjectStore) RegisterAll(replicamap map[string][]Node, timeout time.Duration) {

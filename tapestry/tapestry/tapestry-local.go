@@ -126,6 +126,27 @@ func (local *TapestryNode) findRoot(start Node, id ID) (Node, error) {
 }
 
 /*
+   This method is invoked over RPC by other Tapestry nodes.
+   Register the specified node as an advertiser of the specified key.
+
+   *    Check that we are the root node for the key
+   *    Add the node to the object store
+   *    Kick off a timer to remove the node if it's not advertised again after a set amount of time
+*/
+func (local *TapestryNode) Register(key string, replica Node) (isRoot bool, err error) {
+	root, _ := local.findRoot(local.node, Hash(key))
+	if !equal_ids(root.Id, local.node.Id) {
+		isRoot = false
+		return
+	}
+	isRoot = true
+
+	local.store.Register(key, replica, TIMEOUT)
+
+	return
+}
+
+/*
    Client API.  Publishes the key to tapestry.
    *    Route to the root node for the key
    *    Register our local node on the root
