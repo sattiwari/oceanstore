@@ -110,6 +110,11 @@ func newTapestryRPCServer(port int, tapestry *Tapestry) (server *TapestryRPCServ
 	return
 }
 
+func (server *TapestryRPCServer) Hello(req Node, rsp *Node) (err error) {
+	*rsp = server.tapestry.local.node
+	return
+}
+
 func (server *TapestryRPCServer) validate(expect Node) error {
 	if server.tapestry.local.node != expect {
 		return fmt.Errorf("Remote node expected us to be %v, but we are %v", expect, server.tapestry.local.node)

@@ -76,11 +76,11 @@ func start(id ID, port int, connectTo string) (tapestry *Tapestry, err error) {
 	// If specified, connect to the provided address
 	if connectTo != "" {
 		// Get the node we're joining
-		_, err := tapestry.hello(connectTo)
+		node, err := tapestry.hello(connectTo)
 		if err != nil {
 			return nil, fmt.Errorf("Error joining existing tapestry node %v, reason: %v", address, err)
 		}
-		//err = tapestry.local.Join(node) FIXME
+		err = tapestry.local.Join(node)
 		if err != nil {
 			return nil, err
 		}
@@ -141,4 +141,20 @@ func (tapestry *Tapestry) Get(key string) ([]byte, error) {
 */
 func (tapestry *Tapestry) Remove(key string) bool {
 	return tapestry.blobstore.Delete(key)
+}
+
+/*
+	Leave the tapestry.
+*/
+func (tapestry *Tapestry) Leave() {
+	tapestry.blobstore.DeleteAll()
+	tapestry.local.Leave()
+	tapestry.server.listener.Close()
+}
+
+/*
+   Kill this node without gracefully leaving the tapestry
+*/
+func (tapestry *Tapestry) Kill() {
+	tapestry.server.listener.Close()
 }
