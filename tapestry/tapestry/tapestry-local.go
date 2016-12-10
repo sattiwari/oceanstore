@@ -209,3 +209,181 @@ func (local *TapestryNode) Lookup(key string) (nodes []Node, err error) {
 
 	return
 }
+
+/*
+   This method is invoked over RPC by other Tapestry nodes.
+   *    Add the from node to our backpointers
+   *    Possibly add the node to our routing table, if appropriate
+*/
+func (local *TapestryNode) AddBackpointer(from Node) (err error) {
+	if local.backpointers.Add(from) {
+		fmt.Printf("Added backpointer %v\n", from)
+	}
+	local.addRoute(from)
+	return
+}
+
+/*
+   This method is invoked over RPC by other Tapestry nodes.
+   *    Remove the from node from our backpointers
+*/
+func (local *TapestryNode) RemoveBackpointer(from Node) (err error) {
+	if local.backpointers.Remove(from) {
+		fmt.Printf("Removed backpointer %v\n", from)
+	}
+	return
+}
+
+/*
+   This method is invoked over RPC by other Tapestry nodes.
+   *    Get all backpointers at the level specified
+   *    Possibly add the node to our routing table, if appropriate
+*/
+func (local *TapestryNode) GetBackpointers(from Node, level int) (backpointers []Node, err error) {
+	fmt.Printf("Sending level %v backpointers to %v\n", level, from)
+	backpointers = local.backpointers.Get(level)
+	local.addRoute(from)
+	return
+}
+
+/*
+   Utility function that adds a node to our routing table
+   *    Adds the provided node to the routing table, if appropriate.
+   *    If the node was added to the routing table, notify the node of a backpointer
+   *    If an old node was removed from the routing table, notify the old node of a removed backpointer
+*/
+
+func (local *TapestryNode) addRoute(node Node) (err error) {
+	added, prev := local.table.Add(node)
+
+	// In any case, error was loss of communication with node.
+	if added {
+		err = local.tapestry.addBackpointer(node, local.node)
+	}
+
+	if prev != nil {
+		err = local.tapestry.removeBackpointer(node, local.node)
+	}
+
+	return
+}
+
+/*
+   This method is invoked over RPC by other Tapestry nodes.
+   We are the root node for some new node joining the tapestry.
+   *    Begin the acknowledged multicast
+   *    Return the neighbourset from the multicast
+*/
+func (local *TapestryNode) AddNode(node Node) (neighbourset []Node, err error) {
+	return local.AddNodeMulticast(node, SharedPrefixLength(node.Id, local.node.Id))
+}
+
+/*
+   This method is invoked over RPC by other Tapestry nodes
+   *    Register all of the provided objects in the local object store
+   *    If appropriate, add the from node to our local routing table
+*/
+func (local *TapestryNode) Transfer(from Node, replicamap map[string][]Node) error {
+	local.store.RegisterAll(replicamap, TIMEOUT)
+
+	err := local.addRoute(from)
+	return err
+}
+
+/*
+   This method is invoked over RPC by other Tapestry nodes.
+   A new node is joining the tapestry, and we are a need-to-know node participating in the multicast.
+   *    Propagate the multicast to the specified row in our routing table
+   *    Await multicast response and return the neighbourset
+   *    Begin transfer of appropriate replica info to the new node
+*/
+func (local *TapestryNode) AddNodeMulticast(newnode Node, level int) (neighbours []Node, err error) {
+	fmt.Printf("Add node multicast %v at level %v\n", newnode, level)
+	neighbours = local.table.GetLevel(level)
+	results := make([]Node, 0)
+	for _, target := range neighbours {
+		result, err := local.tapestry.addNodeMulticast(
+			target, newnode, level+1)
+
+		// bad node, continue
+		if err != nil {
+			continue
+		}
+
+		results = append(results, result...)
+	}
+
+	transferReg := local.store.GetTransferRegistrations(local.node, newnode)
+	err = local.tapestry.transfer(newnode, local.node, transferReg)
+
+	// Could not add stuff to new node. We need to reregister what we removed.
+	if err != nil {
+		local.store.RegisterAll(transferReg, TIMEOUT)
+	}
+
+	neighbours = append(neighbours, local.node)
+	neighbours = append(neighbours, results...)
+	return
+}
+
+/*
+   Invoked when starting the local node, if we are connecting to an existing Tapestry.
+   *    Find the root for our node's ID
+   *    Call AddNode on our root to initiate the multicast and receive our initial neighbour set
+   *    Iteratively get backpointers from the neighbour set and populate routing table
+*/
+func (local *TapestryNode) Join(otherNode Node) error {
+	fmt.Printf("Joining\n", otherNode)
+
+	// Route to our root
+	root, err := local.findRoot(otherNode, local.node.Id)
+	if err != nil {
+		return fmt.Errorf("Error joining existing tapestry node %v, reason: %v", otherNode, err)
+	}
+
+	// Add ourselves to our root by invoking AddNode on the remote node
+	neighbours, err := local.tapestry.addNode(root, local.node)
+	if err != nil {
+		return fmt.Errorf("Error adding ourselves to root node %v, reason: %v", root, err)
+	}
+
+	/*
+		"The nodes returned by AddNodeMulticast() will go into the
+		Joining node's routing table, but all these nodes are of length n
+		and greater. This means that rows 0 through n-1 of the node's
+		routing table still need to be filled via backpointer traversal."
+	*/
+
+	level := SharedPrefixLength(local.node.Id, root.Id)
+	for {
+
+		for _, n := range neighbours {
+			local.addRoute(n)
+		}
+
+		if level > 0 {
+			nextNeighbours := make([]Node, 0)
+			for _, neighbour := range neighbours {
+				result, err := local.tapestry.getBackpointers(neighbour, local.node, level-1)
+
+				if err != nil {
+					continue
+				}
+
+				nextNeighbours = append(nextNeighbours, result...)
+
+			}
+			if len(nextNeighbours) == 0 {
+				nextNeighbours = append(nextNeighbours, neighbours...)
+			}
+
+			neighbours = nextNeighbours
+		} else {
+			break
+		}
+
+		level--
+	}
+
+	return err
+}
