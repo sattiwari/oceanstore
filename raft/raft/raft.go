@@ -4,6 +4,7 @@ package raft
 
 type RaftNode struct {
 	leaderAddress *NodeAddr
+	conf          Config
 }
 
 type NodeAddr struct {
