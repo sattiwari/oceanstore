@@ -5,12 +5,21 @@ package raft
 type RaftNode struct {
 	leaderAddress *NodeAddr
 	conf          Config
+	state 		  NodeState
 }
 
 type NodeAddr struct {
 	address string
 	id      string
 }
+
+type NodeState int
+const (
+	FOLLOWERSTATE NodeState = iota
+	CANDIDATESTATE
+	LEADERSTATE
+	JOINSTATE
+)
 
 //TODO not yet complete
 func createNode(localPort int, remoteAddr *NodeAddr, conf *Config) (*RaftNode, error) {
