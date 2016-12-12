@@ -46,5 +46,3 @@ func createCluster(conf *Config) ([] *RaftNode, error) {
 	}
 	return nodes, nil
 }
-
-
