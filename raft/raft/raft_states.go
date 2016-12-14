@@ -1,22 +1,16 @@
 package raft
 
-import (
-	"time"
-)
-
 type state func() state
 
 /**
  * This method contains the logic of a Raft node in the follower state.
  */
 func (r *RaftNode) doFollower() state {
-	electionTimeOut := makeElectionTimeout()
+	electionTimeOut := r.electionTimeOut()
 	for {
 		select {
-		case shutdown := <- r.gracefulExcit:
-			if shutdown {
-				return nil
-			}
+		case off := <- r.gracefulExcit:
+			shutdown(off)
 		case _ = <- r.requestVote:
 		case _ = <- r.appendEntries:
 		case _ = <- r.registerClient:
@@ -34,10 +28,8 @@ func (r *RaftNode) doCandidate() state {
 	electionResults := make(chan bool)
 	for {
 		select {
-		case shutdown := <- r.gracefulExcit:
-			if shutdown {
-				return nil
-			}
+		case off := <- r.gracefulExcit:
+			shutdown(off)
 		case result := <- electionResults:
 			if result {
 				r.doLeader()
@@ -63,7 +55,8 @@ func (r *RaftNode) doLeader() state {
 
 	for {
 		select {
-		case _ = <- r.gracefulExcit:
+		case off := <- r.gracefulExcit:
+			shutdown(off)
 		case _ = <- r.appendEntries:
 		case _ = <- r.heartBeats():
 		case _ = <- fallback:
