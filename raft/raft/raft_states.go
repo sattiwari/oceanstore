@@ -59,6 +59,20 @@ func (r *RaftNode) doCandidate() state {
  * This method contains the logic of a Raft node in the leader state.
  */
 func (r *RaftNode) doLeader() state {
+	fallback := make(chan bool)
+
+	for {
+		select {
+		case _ = <- r.gracefulExcit:
+		case _ = <- r.appendEntries:
+		case _ = <- r.heartBeats():
+		case _ = <- fallback:
+		case _ = <- r.appendEntries:
+		case _ = <- r.registerClient:
+		case _ = <- r.clientRequest:
+
+		}
+	}
 }
 
 func (r *RaftNode) handleCompetingRequestVote(msg RequestVoteMsg) bool {
@@ -91,12 +105,3 @@ func (r *RaftNode) sendHeartBeats(fallback, finish chan bool) {
 func (r *RaftNode) sendAppendEntries(entries []LogEntry) (fallBack, sentToMajority bool) {
 
 }
-
-/**
- * This function will use time.After to create a random timeout.
- */
-func makeElectionTimeout() <-chan time.Time {
-
-}
-
-

@@ -16,5 +16,9 @@ func AddrToId(addr string, length int) string {
 }
 
 func (r *RaftNode) electionTimeOut() <- chan time.Time {
-	return time.After(time.Duration(r.conf.ElectionTimeout))
+	return time.After(r.conf.ElectionTimeout)
+}
+
+func (r *RaftNode) heartBeats() <- chan time.Time {
+	return time.After(r.conf.HeartbeatFrequency)
 }
