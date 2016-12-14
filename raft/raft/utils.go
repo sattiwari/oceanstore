@@ -3,6 +3,7 @@ package raft
 import (
 	"math/big"
 	"crypto/sha1"
+	"time"
 )
 
 func AddrToId(addr string, length int) string {
@@ -14,3 +15,6 @@ func AddrToId(addr string, length int) string {
 	return keyInt.String()
 }
 
+func (r *RaftNode) electionTimeOut() <- chan time.Time {
+	return time.After(time.Duration(r.conf.ElectionTimeout))
+}

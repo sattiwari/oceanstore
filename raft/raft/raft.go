@@ -6,6 +6,14 @@ type RaftNode struct {
 	leaderAddress *NodeAddr
 	conf          Config
 	state 		  NodeState
+
+	// channels to send and rcv RPC messages
+	appendEntries  chan AppendEntriesMsg
+	requestVote    chan RequestVoteMsg
+	clientRequest  chan ClientRequestMsg
+	registerClient chan ClientRegistration
+	gracefulExcit  chan bool
+
 }
 
 type NodeAddr struct {
@@ -25,7 +33,9 @@ const (
 func createNode(localPort int, remoteAddr *NodeAddr, conf *Config) (*RaftNode, error) {
 	var r RaftNode
 	node := &r
+
 	return node, nil
+
 }
 
 func createCluster(conf *Config) ([] *RaftNode, error) {

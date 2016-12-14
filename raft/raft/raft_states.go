@@ -10,7 +10,21 @@ type state func() state
  * This method contains the logic of a Raft node in the follower state.
  */
 func (r *RaftNode) doFollower() state {
+	electionTimeOut := makeElectionTimeout()
+	for {
+		select {
+		case shutdown := <- r.gracefulExcit:
+			if shutdown {
+				return nil
+			}
+		case _ = <- r.requestVote:
+		case _ = <- r.appendEntries:
+		case _ = <- r.registerClient:
+		case _ = <- r.clientRequest:
+		case _ = <- electionTimeOut:
+		}
 
+	}
 }
 
 /**
