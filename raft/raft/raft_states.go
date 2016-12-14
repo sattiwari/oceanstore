@@ -23,15 +23,36 @@ func (r *RaftNode) doFollower() state {
 		case _ = <- r.clientRequest:
 		case _ = <- electionTimeOut:
 		}
-
 	}
+	return nil
 }
 
 /**
  * This method contains the logic of a Raft node in the candidate state.
  */
 func (r *RaftNode) doCandidate() state {
-
+	electionResults := make(chan bool)
+	for {
+		select {
+		case shutdown := <- r.gracefulExcit:
+			if shutdown {
+				return nil
+			}
+		case result := <- electionResults:
+			if result {
+				r.doLeader()
+			} else {
+				r.doFollower()
+			}
+		case _ = r.requestVote:
+		case _ = r.appendEntries:
+		case _ = r.registerClient:
+		case _ = r.clientRequest:
+		case _ = r.electionTimeOut():
+			return r.doFollower()
+		}
+	}
+	return nil
 }
 
 /**
