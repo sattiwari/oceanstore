@@ -14,7 +14,7 @@ func (r *RaftNode) doFollower() state {
 		case off := <- r.gracefulExit:
 			shutdown(off)
 		case vote := <- r.requestVote:
-			fmt.Println("Request Vote Received")
+			fmt.Println("Request Vote Received by Follower")
 			request := vote.request
 			if r.handleCompetingRequests(vote) {
 				r.currentTerm = request.Term
@@ -60,7 +60,19 @@ func (r *RaftNode) doCandidate() state {
 			} else {
 				r.doFollower()
 			}
-		case _ = r.requestVote:
+		case vote := <- r.requestVote:
+			fmt.Println("Request vote received by candidate")
+			request := vote.request
+			if r.handleCompetingRequests(vote) {
+				r.currentTerm = request.Term
+				r.leaderAddress = nil
+				r.votedFor = request.CandidateId
+				r.doFollower()
+			} else {
+				if r.currentTerm < request.Term {
+					r.currentTerm = request.Term
+				}
+			}
 		case _ = r.appendEntries:
 		case _ = r.registerClient:
 		case _ = r.clientRequest:
