@@ -13,7 +13,19 @@ func (r *RaftNode) doFollower() state {
 		select {
 		case off := <- r.gracefulExit:
 			shutdown(off)
-		case _ = <- r.requestVote:
+		case vote := <- r.requestVote:
+			fmt.Println("Request Vote Received")
+			request := vote.request
+			if r.handleCompetingRequests(vote) {
+				r.currentTerm = request.Term
+				r.votedFor = request.CandidateId
+				r.leaderAddress = nil
+				electionTimeOut = r.electionTimeOut()
+			} else {
+				if request.Term > r.currentTerm {
+					r.currentTerm = request.Term
+				}
+			}
 		case _ = <- r.appendEntries:
 		case _ = <- r.registerClient:
 		case _ = <- r.clientRequest:
