@@ -1,0 +1,5 @@
+package raft
+
+func electionTimeOut()  {
+	
+}

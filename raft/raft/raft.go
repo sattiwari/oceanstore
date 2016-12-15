@@ -3,17 +3,23 @@ package raft
 //import "fmt"
 
 type RaftNode struct {
-	leaderAddress *NodeAddr
-	conf          Config
-	state 		  NodeState
+	leaderAddress  *NodeAddr
+	conf           Config
+	state          NodeState
+	votedFor       uint64
+	id             string
+	localAddr      NodeAddr
 
 	// channels to send and rcv RPC messages
 	appendEntries  chan AppendEntriesMsg
 	requestVote    chan RequestVoteMsg
 	clientRequest  chan ClientRequestMsg
 	registerClient chan ClientRegistration
-	gracefulExcit  chan bool
+	gracefulExit   chan bool
 
+	currentTerm    uint64
+	votedFor       NodeAddr
+	otherNodes     []NodeAddr
 }
 
 type NodeAddr struct {
@@ -22,6 +28,7 @@ type NodeAddr struct {
 }
 
 type NodeState int
+
 const (
 	FOLLOWERSTATE NodeState = iota
 	CANDIDATESTATE

@@ -1,5 +1,7 @@
 package raft
 
+import "fmt"
+
 type state func() state
 
 /**
@@ -9,13 +11,14 @@ func (r *RaftNode) doFollower() state {
 	electionTimeOut := r.electionTimeOut()
 	for {
 		select {
-		case off := <- r.gracefulExcit:
+		case off := <- r.gracefulExit:
 			shutdown(off)
 		case _ = <- r.requestVote:
 		case _ = <- r.appendEntries:
 		case _ = <- r.registerClient:
 		case _ = <- r.clientRequest:
 		case _ = <- electionTimeOut:
+			return r.doCandidate()
 		}
 	}
 	return nil
@@ -26,9 +29,18 @@ func (r *RaftNode) doFollower() state {
  */
 func (r *RaftNode) doCandidate() state {
 	electionResults := make(chan bool)
+	electionTimeOut := r.electionTimeOut()
+
+	r.state = CANDIDATESTATE
+	r.leaderAddress = nil
+	r.votedFor = r.id
+
+	r.requestVotes(electionResults)
+
+
 	for {
 		select {
-		case off := <- r.gracefulExcit:
+		case off := <- r.gracefulExit:
 			shutdown(off)
 		case result := <- electionResults:
 			if result {
@@ -40,7 +52,7 @@ func (r *RaftNode) doCandidate() state {
 		case _ = r.appendEntries:
 		case _ = r.registerClient:
 		case _ = r.clientRequest:
-		case _ = r.electionTimeOut():
+		case _ = electionTimeOut:
 			return r.doFollower()
 		}
 	}
@@ -55,7 +67,7 @@ func (r *RaftNode) doLeader() state {
 
 	for {
 		select {
-		case off := <- r.gracefulExcit:
+		case off := <- r.gracefulExit:
 			shutdown(off)
 		case _ = <- r.appendEntries:
 		case _ = <- r.heartBeats():
@@ -78,7 +90,33 @@ func (r *RaftNode) handleCompetingRequestVote(msg RequestVoteMsg) bool {
  * successful election, false otherwise.
  */
 func (r *RaftNode) requestVotes(electionResults chan bool) {
-
+	go func() {
+		nodes := r.otherNodes
+		numNodes := len(nodes)
+		votes := 1
+		for _, node := range nodes {
+			if node.id == r.id {
+				continue
+			}
+			request := RequestVoteMsg{RequestVote{r.currentTerm, r.localAddr}}
+			reply, _ := r.requestVoteRPC(&node, request)
+			if reply == nil {
+				continue
+			}
+			if r.currentTerm < reply.Term {
+				fmt.Println("[Term outdated] Current = %d, Remote = %d", r.currentTerm, reply.Term)
+				electionResults <-  false
+				return
+			}
+			if reply.VoteGranted {
+				votes++
+			}
+		}
+		if votes > numNodes / 2 {
+			electionResults <- true
+		}
+		electionResults <- false
+	}()
 }
 
 /**

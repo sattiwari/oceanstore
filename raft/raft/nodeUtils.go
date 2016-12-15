@@ -5,3 +5,7 @@ func shutdown(off bool) {
 		return nil
 	}
 }
+
+func (r *RaftNode) setCurrentTerm(newTerm uint64) {
+
+}
