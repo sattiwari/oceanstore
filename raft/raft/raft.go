@@ -20,6 +20,7 @@ type RaftNode struct {
 	currentTerm    uint64
 	votedFor       NodeAddr
 	otherNodes     []NodeAddr
+	commitIndex    uint64
 }
 
 type NodeAddr struct {

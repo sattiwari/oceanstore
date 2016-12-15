@@ -3,6 +3,8 @@ package raft
 type RequestVote struct {
 	Term uint64
 	CandidateId NodeAddr
+	CandidateLastLogTerm uint64
+	CandidateLastLogIndex uint64
 }
 
 type RequestVoteReply struct {
