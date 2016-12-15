@@ -84,40 +84,6 @@ func (r *RaftNode) handleCompetingRequestVote(msg RequestVoteMsg) bool {
 
 }
 
-/**
- * This function is called to request votes from all other nodes. It takes
- * a channel which the result of the vote should be sent over: true for
- * successful election, false otherwise.
- */
-func (r *RaftNode) requestVotes(electionResults chan bool) {
-	go func() {
-		nodes := r.otherNodes
-		numNodes := len(nodes)
-		votes := 1
-		for _, node := range nodes {
-			if node.id == r.id {
-				continue
-			}
-			request := RequestVoteMsg{RequestVote{r.currentTerm, r.localAddr}}
-			reply, _ := r.requestVoteRPC(&node, request)
-			if reply == nil {
-				continue
-			}
-			if r.currentTerm < reply.Term {
-				fmt.Println("[Term outdated] Current = %d, Remote = %d", r.currentTerm, reply.Term)
-				electionResults <-  false
-				return
-			}
-			if reply.VoteGranted {
-				votes++
-			}
-		}
-		if votes > numNodes / 2 {
-			electionResults <- true
-		}
-		electionResults <- false
-	}()
-}
 
 /**
  * This function is used by the leader to send out heartbeats to each of
