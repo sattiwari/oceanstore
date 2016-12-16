@@ -6,6 +6,7 @@ import (
 	"time"
 	"net/rpc"
 	"fmt"
+	"os"
 )
 
 var connectionMap = make(map[string] *rpc.Client)
@@ -44,4 +45,15 @@ func makeRemoteCall(remoteNode *NodeAddr, method string, req interface{}, resp i
 		return err
 	}
 	return nil
+}
+
+func getFileStats(filename string) (uint64, bool) {
+	stats, err := os.Stat(filename)
+	if err == nil {
+		return stats.Size(), true
+	} else if os.IsNotExist(err) {
+		return 0, false
+	} else {
+		panic(err)
+	}
 }

@@ -1,6 +1,9 @@
 package raft
 
-import "fmt"
+import (
+	"fmt"
+	"time"
+)
 
 type state func() state
 
@@ -8,6 +11,7 @@ type state func() state
  * This method contains the logic of a Raft node in the follower state.
  */
 func (r *RaftNode) doFollower() state {
+	fmt.Println("Transitioning to follower state")
 	electionTimeOut := r.electionTimeOut()
 	for {
 		select {
@@ -40,6 +44,7 @@ func (r *RaftNode) doFollower() state {
  * This method contains the logic of a Raft node in the candidate state.
  */
 func (r *RaftNode) doCandidate() state {
+	fmt.Println("Transitioning to candidate state")
 	electionResults := make(chan bool)
 	electionTimeOut := r.electionTimeOut()
 
@@ -77,7 +82,7 @@ func (r *RaftNode) doCandidate() state {
 		case _ = r.registerClient:
 		case _ = r.clientRequest:
 		case _ = electionTimeOut:
-			return r.doFollower()
+			return r.doCandidate()
 		}
 	}
 	return nil
@@ -87,14 +92,27 @@ func (r *RaftNode) doCandidate() state {
  * This method contains the logic of a Raft node in the leader state.
  */
 func (r *RaftNode) doLeader() state {
+	fmt.Println("Transitioning to leader state")
+	r.leaderAddress = r.localAddr
+	r.votedFor = ""
+	r.state = LEADERSTATE
+
+	beats := r.heartBeats()
 	fallback := make(chan bool)
+	finish := make(chan bool, 1)
 
 	for {
 		select {
 		case off := <- r.gracefulExit:
 			shutdown(off)
 		case _ = <- r.appendEntries:
-		case _ = <- r.heartBeats():
+		case _ = <- beats:
+			select {
+				case <- finish:
+				default:
+					time.After(time.Millisecond * 1)
+				}
+
 		case _ = <- fallback:
 		case _ = <- r.appendEntries:
 		case _ = <- r.registerClient:

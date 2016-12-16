@@ -1,5 +1,7 @@
 package raft
 
+import "fmt"
+
 func shutdown(off bool) {
 	if (off) {
 		return nil
@@ -49,4 +51,11 @@ func (r *RaftNode) handleCompetingRequests(msg RequestVoteMsg) bool {
 			}
 		}
 	}
+}
+
+func (r *RaftNode) sendNoop() {
+	entries := make([]LogEntry, 1)
+	entries[0] = LogEntry{r.getLastLogIndex() + 1, r.currentTerm, make([]byte, 0)}
+	fmt.Println("NOOP logged with log index %d and term index %d", r.getLastLogIndex() + 1, r.currentTerm)
+	r.appendEntries
 }

@@ -9,6 +9,7 @@ type RaftNode struct {
 	votedFor       uint64
 	id             string
 	localAddr      NodeAddr
+	port uint64
 
 	// channels to send and rcv RPC messages
 	appendEntries  chan AppendEntriesMsg
@@ -17,10 +18,14 @@ type RaftNode struct {
 	registerClient chan ClientRegistration
 	gracefulExit   chan bool
 
+	logCache []LogEntry
+
 	currentTerm    uint64
-	votedFor       NodeAddr
 	otherNodes     []NodeAddr
 	commitIndex    uint64
+
+	logFile string
+	metaFile string
 }
 
 type NodeAddr struct {
