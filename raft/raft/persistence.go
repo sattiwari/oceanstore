@@ -5,6 +5,8 @@ import (
 	"fmt"
 )
 
+const INT_GOB_SIZE uint64 = 5
+
 type NodeStableState struct {
 	currentTerm uint64
 }
@@ -80,7 +82,9 @@ func (r *RaftNode) initStableStore() (bool, error) {
 			return freshnode, err
 		}
 
-
+		initEntry := LogEntry{Index: 0, Term: 0, Data: []byte{0}}
+		r.appendLogEntry(initEntry)
+		r.currentTerm = 0
 	}
-
+	return freshnode, nil
 }
