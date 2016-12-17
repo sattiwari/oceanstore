@@ -46,3 +46,34 @@ func CreateClient(remoteAddr NodeAddr) (cp *Client, err error) {
 	cp.Leader = remoteAddr
 	return 
 }
+
+func (c *Client) SendRequest(command FsmCommand, data []byte) (err error) {
+	request := ClientRequest{c.Id, c.SeqNum, command, data}
+	c.SeqNum += 1
+	var reply *ClientReply
+	retries := 0
+
+	LOOP:
+		for retries < MAX_RETRIES {
+			reply, err = ClientRequestRPC(c.Leader, request)
+			if err != nil {
+				return
+			}
+			switch reply.Status {
+			case OK:
+				Debug.Printf("%v is leader\n", c.Leader)
+				Out.Printf("Request returned %v\n", reply.Response)
+				break LOOP
+			case REQUEST_FAILED:
+				Error.Printf("Request failed: %v", reply.Response)
+				retries++
+				break LOOP
+			case NOT_LEADER:
+				c.Leader = reply.LeaderHint
+			case ELECTION_IN_PROGRESS:
+				c.Leader = reply.LeaderHint
+				time.Sleep(time.Millisecond * 200)
+			}
+		}
+	return
+}
