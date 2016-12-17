@@ -3,6 +3,7 @@ package raft
 import (
 	"net"
 	"sync"
+	"net/rpc"
 )
 
 //import "fmt"
@@ -62,11 +63,73 @@ type NodeAddr struct {
 	Id      string
 }
 
-func createNode(localPort int, remoteAddr *NodeAddr, conf *Config) (*RaftNode, error) {
+func createNode(localPort int, remoteAddr *NodeAddr, conf *Config) (rp *RaftNode, err error) {
 	var r RaftNode
-	node := &r
+	rp = &r
+	var conn net.Listener
 
-	return node, nil
+	r.IsShutDown = false
+	r.conf = conf
+
+	//init rpc channels
+	r.appendEntries = make(chan AppendEntriesMsg)
+	r.requestVote = make(chan RequestVoteMsg)
+	r.clientRequest = make(chan ClientRequestMsg)
+	r.registerClient = make(chan RegisterClientMsg)
+	r.gracefulExit = make(chan bool)
+
+	r.hash = nil
+	r.requestMap = make(map[uint64]ClientRequestMsg)
+
+	r.commitIndex = 0
+	r.lastApplied = 0
+	r.nextIndex = make(map[string]uint64)
+	r.matchIndex = make(map[string]uint64)
+
+	r.Testing = NewTesting()
+	r.Testing.PauseWorld(false)
+
+	if localPort != 0 {
+		conn, err = OpenPort(localPort)
+	} else {
+		conn, localPort, err = OpenListener()
+	}
+
+	if err != nil {
+		return
+	}
+
+	// create node id based on listener address
+	r.Id = AddrToId(conn.Addr().String(), conf.NodeIdSize)
+
+	r.Listener = conn
+	r.listenPort = localPort
+	Out.Printf("started node with id %v, listening at %v", r.Id, conn.Addr().String())
+
+	freshNode, err := r.initStableStore()
+	if err != nil {
+		Error.Printf("Error initializing the stable store: %v", err)
+		return nil, err
+	}
+
+	r.setLocalAddr(&NodeAddr{Id: r.Id, Address: conn.Addr().String()})
+
+	//start rpc server
+	r.RPCServer = & RaftRPCServer{rp}
+	rpc.RegisterName(r.GetLocalAddr().Address, r.RPCServer)
+	go r.RPCServer.startRPCServer()
+
+	if freshNode {
+		r.State = JOIN_STATE
+		if remoteAddr != nil {
+			err = JoinRPC(remoteAddr, r.GetLocalAddr())
+		}
+	} else {
+		r.State = FOLLOWER_STATE
+		go r.run()
+	}
+
+	return
 
 }
 
@@ -87,4 +150,11 @@ func createCluster(conf *Config) ([] *RaftNode, error) {
 		}
 	}
 	return nodes, nil
+}
+
+func (r *RaftNode) run() {
+	curr := r.doFollower()
+	for curr != nil {
+		curr = curr()
+	}
 }
