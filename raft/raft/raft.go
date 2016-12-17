@@ -1,49 +1,67 @@
 package raft
 
+import (
+	"net"
+	"sync"
+)
+
 //import "fmt"
-
-type RaftNode struct {
-	leaderAddress  *NodeAddr
-	conf           Config
-	state          NodeState
-	votedFor       uint64
-	id             string
-	localAddr      NodeAddr
-	port uint64
-
-	// channels to send and rcv RPC messages
-	appendEntries  chan AppendEntriesMsg
-	requestVote    chan RequestVoteMsg
-	clientRequest  chan ClientRequestMsg
-	registerClient chan ClientRegistration
-	gracefulExit   chan bool
-
-	logCache []LogEntry
-
-	currentTerm    uint64
-	otherNodes     []NodeAddr
-	commitIndex    uint64
-
-	logFileDescriptor  FileData
-	metaFileDescriptor FileData
-	metaFile string
-}
-
-type NodeAddr struct {
-	address string
-	id      string
-}
 
 type NodeState int
 
 const (
-	FOLLOWERSTATE NodeState = iota
-	CANDIDATESTATE
-	LEADERSTATE
-	JOINSTATE
+	FOLLOWER_STATE NodeState = iota
+	CANDIDATE_STATE
+	LEADER_STATE
+	JOIN_STATE
 )
 
-//TODO not yet complete
+type RaftNode struct {
+	Id                 string
+	Listener           net.Listener
+	listenPort         uint64
+	State              NodeState
+	LeaderAddress      *NodeAddr
+
+	conf               *Config
+	IsShutDown bool
+	RPCServer *RaftRPCServer
+	mutex sync.Mutex
+	Testing *TestingPolicy
+
+	logCache           []LogEntry
+
+	//file descriptors and values for persistent state
+	logFileDescriptor  FileData
+	metaFileDescriptor FileData
+	stableState NodeStableState
+	ssMutex sync.Mutex
+
+	//leader specific volatile state
+	commitIndex uint64
+	lastApplied uint64
+	leaderMutex map[string]uint64
+	nextIndex map[string]uint64
+	matchIndex map[string]uint64
+
+	// channels to send and rcv RPC messages
+	appendEntries      chan AppendEntriesMsg
+	requestVote        chan RequestVoteMsg
+	clientRequest      chan ClientRequestMsg
+	registerClient     chan ClientRegistration
+	gracefulExit       chan bool
+
+//	the replicated state machine
+	hash []byte
+	requestMutex sync.Mutex
+	requestMap map[uint64]ClientRequestMsg
+}
+
+type NodeAddr struct {
+	Address string
+	Id      string
+}
+
 func createNode(localPort int, remoteAddr *NodeAddr, conf *Config) (*RaftNode, error) {
 	var r RaftNode
 	node := &r
@@ -63,7 +81,7 @@ func createCluster(conf *Config) ([] *RaftNode, error) {
 	nodes := make([] *RaftNode, conf.ClusterSize)
 	nodes[0], err = createNode(0, nil, conf)
 	for i := 1; i < conf.ClusterSize; i++ {
-		nodes[i], err = createNode(0, nodes[0].leaderAddress, conf)
+		nodes[i], err = createNode(0, nodes[0].LeaderAddress, conf)
 		if err != nil {
 			return nil, err
 		}
