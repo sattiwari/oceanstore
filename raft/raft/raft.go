@@ -24,7 +24,8 @@ type RaftNode struct {
 	otherNodes     []NodeAddr
 	commitIndex    uint64
 
-	logFileDescriptor FileData
+	logFileDescriptor  FileData
+	metaFileDescriptor FileData
 	metaFile string
 }
 

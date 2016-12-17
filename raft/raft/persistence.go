@@ -36,6 +36,13 @@ func CreateRaftLog(fileData *FileData) error {
 	return err
 }
 
+func CreateMetaLog(FileData *FileData) error {
+	fd, err := os.OpenFile(FileData.fileName, os.O_CREATE | os.O_APPEND | os.O_WRONLY, 0600)
+	FileData.fileDescriptor = fd
+	FileData.isFileDescriptorOpen = true
+	return err
+}
+
 func (r *RaftNode) initStableStore() (bool, error) {
 	freshnode := false
 	err := os.Mkdir(r.conf.LogPath, 0777)
@@ -44,10 +51,15 @@ func (r *RaftNode) initStableStore() (bool, error) {
 	} else {
 		fmt.Println("Created log directory %v\n", r.conf.LogPath)
 	}
-	logFileName := fmt.Sprint("%v/%d_raft_log.dat", r.conf.LogPath, r.port)
-	r.logFileDescriptor = FileData{fileName: logFileName}
-	r.metaFile = fmt.Sprint("%v/%d_raft_meta.dat", r.conf.LogPath, r.port)
+
+	logFileName  := fmt.Sprint("%v/%d_raft_log.dat", r.conf.LogPath, r.port)
+	metaFileName := fmt.Sprint("%v/%d_raft_meta.dat", r.conf.LogPath, r.port)
+
+	r.logFileDescriptor  = FileData{fileName: logFileName}
+	r.metaFileDescriptor = FileData{fileName: metaFileName}
+
 	_, raftLogExists  := getFileStats(r.logFileDescriptor.fileDescriptor)
+
 	_, raftMetaExists := false
 
 	if raftLogExists && raftMetaExists {
@@ -60,6 +72,11 @@ func (r *RaftNode) initStableStore() (bool, error) {
 
 		err := CreateRaftLog(&r.logFileDescriptor)
 		if err !=  nil {
+			return freshnode, err
+		}
+
+		err = CreateMetaLog(&r.metaFileDescriptor)
+		if err != nil {
 			return freshnode, err
 		}
 
