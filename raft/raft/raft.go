@@ -4,6 +4,7 @@ import (
 	"net"
 	"sync"
 	"net/rpc"
+	"time"
 )
 
 //import "fmt"
@@ -63,7 +64,7 @@ type NodeAddr struct {
 	Id      string
 }
 
-func createNode(localPort int, remoteAddr *NodeAddr, conf *Config) (rp *RaftNode, err error) {
+func createNode(localPort int, leaderAddr *NodeAddr, conf *Config) (rp *RaftNode, err error) {
 	var r RaftNode
 	rp = &r
 	var conn net.Listener
@@ -121,8 +122,11 @@ func createNode(localPort int, remoteAddr *NodeAddr, conf *Config) (rp *RaftNode
 
 	if freshNode {
 		r.State = JOIN_STATE
-		if remoteAddr != nil {
-			err = JoinRPC(remoteAddr, r.GetLocalAddr())
+		if leaderAddr != nil {
+			err = JoinRPC(leaderAddr, r.GetLocalAddr())
+		} else {
+			Out.Printf("waiting to start node until all have joined\n")
+			r.startNodes()
 		}
 	} else {
 		r.State = FOLLOWER_STATE
@@ -131,6 +135,23 @@ func createNode(localPort int, remoteAddr *NodeAddr, conf *Config) (rp *RaftNode
 
 	return
 
+}
+
+func (r *RaftNode) startNodes()  {
+	r.mutex.Lock()
+	r.AppendOtherNodes(r.GetLocalAddr())
+	r.mutex.Unlock()
+
+	for len(r.GetOtherNodes()) < r.conf.ClusterSize {
+		time.Sleep(time.Millisecond * 100)
+	}
+
+	for _, otherNode := range r.GetOtherNodes() {
+		if r.Id != otherNode.Id {
+			Out.Print("%v starting node %v", r.Id, otherNode.Id)
+			StartNodeRPC(otherNode, r.GetOtherNodes()[:])
+		}
+	}
 }
 
 func createCluster(conf *Config) ([] *RaftNode, error) {
