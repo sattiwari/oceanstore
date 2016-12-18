@@ -9,6 +9,15 @@ type StartNodeReply struct {
 	Success bool
 }
 
+type JoinRequest struct {
+	RemoteNode NodeAddr
+	FromNode NodeAddr
+}
+
+type JoinReply struct {
+	Success bool
+}
+
 type RequestVote struct {
 	Term uint64
 	CandidateId NodeAddr
@@ -34,7 +43,16 @@ func StartNodeRPC(remoteNode NodeAddr, otherNodes []NodeAddr) error {
 }
 
 func JoinRPC(remoteNode *NodeAddr, fromAddr *NodeAddr) error {
-
+	request := JoinRequest{RemoteNode: *remoteNode, FromNode: *fromAddr}
+	var reply JoinReply
+	err := makeRemoteCall(remoteNode, "JoinImpl", request, &reply)
+	if err != nil {
+		return err
+	}
+	if !reply.Success {
+		Error.Printf("%v Unable to join cluster", fromAddr.Id)
+	}
+	return err
 }
 
 func (r *RaftNode) requestVoteRPC(remoteNode *NodeAddr, request RequestVote) (*RequestVoteReply, error) {
