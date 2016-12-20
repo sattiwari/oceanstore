@@ -140,7 +140,7 @@ func (r *RaftNode) initStableStore() (bool, error) {
 
 		initEntry := LogEntry{Index: 0, Term: 0, Data: []byte{0}}
 		r.appendLogEntry(initEntry)
-		r.currentTerm = 0
+		r.SetCurrentTerm(0)
 	}
 	return freshnode, nil
 }
@@ -161,4 +161,19 @@ func (r *RaftNode) AddRequest(req ClientRequest, rep ClientReply) error {
 		panic(err)
 	}
 	return nil
+}
+
+func (r *RaftNode) SetCurrentTerm(newTerm uint64) {
+	r.ssMutex.Lock()
+	defer r.ssMutex.Unlock()
+
+	if r.stableState.CurrentTerm != newTerm {
+		Out.Println("Changing current term from %v to %v", r.stableState.CurrentTerm, newTerm)
+	}
+	r.stableState.CurrentTerm = newTerm
+	err := WriteStableState(&r.metaFileDescriptor, r.stableState)
+	if err != nil {
+		Error.Println("Unable to flush new term to disk %v", err)
+		panic(err)
+	}
 }
