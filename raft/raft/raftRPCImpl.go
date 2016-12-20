@@ -48,12 +48,15 @@ func (server *RaftRPCServer) RequestVoteImpl(request *RequestVoteRequest, reply 
 	return err
 }
 
-//func (server *RaftRPCServer) AppendEntriesImpl(request *AppendEntriesRequest, reply *AppendEntriesReply) error {
-//	err := server.node.AppendEntries(request)
-//	reply.Success = err == nil
-//	return err
-//}
-//
+func (server *RaftRPCServer) AppendEntriesImpl(request *AppendEntriesRequest, reply *AppendEntriesReply) error {
+	if server.node.Testing.IsDenied(request.LeaderId, server.node.GetLocalAddr()) {
+		return ErrorTestingPolicyDenied
+	}
+	aereply, err := server.node.AppendEntries(request)
+	*reply = aereply
+	return err
+}
+
 //func (server *RaftRPCServer) RegisterClientImpl(request *RegisterClientRequest, reply *RegisterClientReply) error {
 //	err := server.node.RegisterClient(request)
 //	reply.Success = err == nil

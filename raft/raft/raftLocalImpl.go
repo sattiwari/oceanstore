@@ -30,10 +30,13 @@ func (r *RaftNode) RequestVote(request *RequestVoteRequest) (RequestVoteReply, e
 	return <-reply, nil
 }
 
-//func (r *RaftNode) AppendEntries(request *AppendEntriesRequest) error {
-//
-//}
-//
+func (r *RaftNode) AppendEntries(request *AppendEntriesRequest) (AppendEntriesReply, error) {
+	Debug.Printf("AppendEntries request received\n")
+	reply := make(chan AppendEntriesReply)
+	r.requestVote <- AppendEntriesMsg{request:request, reply: reply}
+	return <-reply, nil
+}
+
 //func (r *RaftNode) RegisterClient(request *RegisterClientRequest) error {
 //
 //}
