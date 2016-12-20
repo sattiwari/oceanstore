@@ -57,12 +57,12 @@ func (server *RaftRPCServer) AppendEntriesImpl(request *AppendEntriesRequest, re
 	return err
 }
 
-//func (server *RaftRPCServer) RegisterClientImpl(request *RegisterClientRequest, reply *RegisterClientReply) error {
-//	err := server.node.RegisterClient(request)
-//	reply.Success = err == nil
-//	return err
-//}
-//
+func (server *RaftRPCServer) RegisterClientImpl(request *RegisterClientRequest, reply *RegisterClientReply) error {
+	rcreply, err := server.node.RegisterClient(request)
+	reply = *rcreply
+	return err
+}
+
 //func (server *RaftRPCServer) ClientRequestImpl(request *ClientRequest, reply *ClientReply) error {
 //	err := server.node.StartNode(request)
 //	reply.Success = err == nil

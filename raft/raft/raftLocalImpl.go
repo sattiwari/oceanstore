@@ -37,10 +37,13 @@ func (r *RaftNode) AppendEntries(request *AppendEntriesRequest) (AppendEntriesRe
 	return <-reply, nil
 }
 
-//func (r *RaftNode) RegisterClient(request *RegisterClientRequest) error {
-//
-//}
-//
+func (r *RaftNode) RegisterClient(request *RegisterClientRequest) (RegisterClientReply, error) {
+	Debug.Printf("Register client request received\n")
+	reply := make(chan RegisterClientReply)
+	r.registerClient <- RegisterClientMsg{request: request, reply: reply}
+	return <-reply, nil
+}
+
 //func (r *RaftNode) ClientRequest(request *ClientRequest) error {
 //
 //}
