@@ -63,8 +63,8 @@ func (server *RaftRPCServer) RegisterClientImpl(request *RegisterClientRequest, 
 	return err
 }
 
-//func (server *RaftRPCServer) ClientRequestImpl(request *ClientRequest, reply *ClientReply) error {
-//	err := server.node.StartNode(request)
-//	reply.Success = err == nil
-//	return err
-//}
+func (server *RaftRPCServer) ClientRequestImpl(request *ClientRequest, reply *ClientReply) error {
+	rcreply, err := server.node.RegisterClient(request)
+	reply = *rcreply
+	return err
+}

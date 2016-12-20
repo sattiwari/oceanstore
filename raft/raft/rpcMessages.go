@@ -1,18 +1,21 @@
 package raft
 
 type AppendEntriesMsg struct {
-
+	request *AppendEntriesRequest
+	reply chan AppendEntriesReply
 }
 
 type RequestVoteMsg struct {
-	request *RequestVote
+	request *RequestVoteRequest
 	reply chan RequestVoteReply
 }
 
 type ClientRequestMsg struct {
-
+	request *ClientRequest
+	reply chan ClientReply
 }
 
-type ClientRegistration struct {
-
+type RegisterClientMsg struct {
+	request *RegisterClientRequest
+	reply chan RegisterClientReply
 }

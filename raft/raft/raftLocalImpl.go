@@ -44,6 +44,9 @@ func (r *RaftNode) RegisterClient(request *RegisterClientRequest) (RegisterClien
 	return <-reply, nil
 }
 
-//func (r *RaftNode) ClientRequest(request *ClientRequest) error {
-//
-//}
+func (r *RaftNode) ClientRequest(request *ClientRequest) (ClientReply, error) {
+	Debug.Printf("Client request received\n")
+	reply := make(chan ClientReply)
+	r.registerClient <- ClientRequestMsg{request: request, reply: reply}
+	return <-reply, nil
+}
