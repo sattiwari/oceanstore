@@ -50,7 +50,7 @@ type RaftNode struct {
 	appendEntries      chan AppendEntriesMsg
 	requestVote        chan RequestVoteMsg
 	clientRequest      chan ClientRequestMsg
-	registerClient     chan ClientRegistration
+	registerClient     chan RegisterClientMsg
 	gracefulExit       chan bool
 
 //	the replicated state machine
@@ -113,7 +113,7 @@ func createNode(localPort int, leaderAddr *NodeAddr, conf *Config) (rp *RaftNode
 		return nil, err
 	}
 
-	r.setLocalAddr(&NodeAddr{Id: r.Id, Address: conn.Addr().String()})
+	r.SetLocalAddr(&NodeAddr{Id: r.Id, Address: conn.Addr().String()})
 
 	//start rpc server
 	r.RPCServer = & RaftRPCServer{rp}
@@ -178,4 +178,10 @@ func (r *RaftNode) run() {
 	for curr != nil {
 		curr = curr()
 	}
+}
+
+func (r *RaftNode) GracefulExit() {
+	r.Testing.PauseWorld(true)
+	Out.Println("gracefully shutting down the node %v", r.Id)
+	r.gracefulExit <- true
 }
