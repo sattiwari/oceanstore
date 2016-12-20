@@ -39,12 +39,15 @@ func (server *RaftRPCServer) JoinImpl(request *JoinRequest, reply *JoinReply) er
 	return err
 }
 
-//func (server *RaftRPCServer) RequestVoteImpl(request *RequestVoteRequest, reply *RequestVoteReply) error {
-//	rvReply, err := server.node.RequestVote(request)
-//	reply.VoteGranted = err == nil
-//	return err
-//}
-//
+func (server *RaftRPCServer) RequestVoteImpl(request *RequestVoteRequest, reply *RequestVoteReply) error {
+	if server.node.Testing.IsDenied(request.FromNode, server.node.GetLocalAddr()) {
+		return ErrorTestingPolicyDenied
+	}
+	rvReply, err := server.node.RequestVote(request)
+	*reply = rvReply
+	return err
+}
+
 //func (server *RaftRPCServer) AppendEntriesImpl(request *AppendEntriesRequest, reply *AppendEntriesReply) error {
 //	err := server.node.AppendEntries(request)
 //	reply.Success = err == nil

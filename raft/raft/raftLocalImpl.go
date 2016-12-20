@@ -23,10 +23,13 @@ func (r *RaftNode) Join(request *JoinRequest) error {
 	return nil
 }
 
-//func (r *RaftNode) RequestVote(request *RequestVoteRequest) error {
-//
-//}
-//
+func (r *RaftNode) RequestVote(request *RequestVoteRequest) (RequestVoteReply, error) {
+	Debug.Printf("RequestVote request received\n")
+	reply := make(chan RequestVoteReply)
+	r.requestVote <- RequestVoteMsg{request:request, reply: reply}
+	return <-reply, nil
+}
+
 //func (r *RaftNode) AppendEntries(request *AppendEntriesRequest) error {
 //
 //}
