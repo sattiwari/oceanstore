@@ -30,6 +30,9 @@ type LogEntry struct {
 	Term uint64
 	Data []byte
 	Command FsmCommand
+
+	//this Id is used when caching the response after processing the command. Empty string means no caching.
+	CacheId string
 }
 
 type FileData struct {
