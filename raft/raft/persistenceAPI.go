@@ -3,6 +3,7 @@ package raft
 import (
 	"os"
 	"fmt"
+	"errors"
 )
 
 const INT_GOB_SIZE uint64 = 5
@@ -28,6 +29,7 @@ type LogEntry struct {
 	Index uint64
 	Term uint64
 	Data []byte
+	Command FsmCommand
 }
 
 type FileData struct {
@@ -38,11 +40,11 @@ type FileData struct {
 	isFileDescriptorOpen bool
 }
 
-func (r *RaftNode) getLastLogIndex() uint64 {
+func (r *RaftNode) GetLastLogIndex() uint64 {
 	return uint64(len(r.logCache) - 1)
 }
 
-func (r *RaftNode) setLocalAddr(addr *NodeAddr) {
+func (r *RaftNode) SetLocalAddr(addr *NodeAddr) {
 	r.ssMutex.Lock()
 	defer r.ssMutex.Unlock()
 	r.stableState.LocalAddr = *addr
@@ -59,6 +61,17 @@ func (r *RaftNode) GetLocalAddr() *NodeAddr {
 
 func (r *RaftNode) GetOtherNodes() []NodeAddr {
 	return r.stableState.OtherNodes
+}
+
+func (r *RaftNode) SetOtherNodes(nodes []NodeAddr) {
+	r.ssMutex.Lock()
+	defer r.ssMutex.Unlock()
+	r.stableState.OtherNodes = nodes
+	err := WriteStableState(&r.metaFileDescriptor, r.stableState)
+	if err != nil {
+		Error.Printf("unable to flush new other nodes to disk: %v", err)
+		panic(err)
+	}
 }
 
 func (r *RaftNode) AppendOtherNodes(other NodeAddr) {
@@ -130,4 +143,22 @@ func (r *RaftNode) initStableStore() (bool, error) {
 		r.currentTerm = 0
 	}
 	return freshnode, nil
+}
+
+func (r *RaftNode) AddRequest(req ClientRequest, rep ClientReply) error {
+	r.ssMutex.Lock()
+	defer r.ssMutex.Unlock()
+
+	uniqueID := fmt.Sprintf("%v-%v", req.ClientId, req.SequenceNumber)
+	_, ok := r.stableState.ClientRequestSequences[uniqueID]
+	if ok {
+		return errors.New("Request with same client and sequence number exists")
+	}
+	r.stableState.ClientRequestSequences[uniqueID] = rep
+	err := WriteStableState(&r.metaFileDescriptor, r.stableState)
+	if err != nil {
+		Error.Println("Unable to flush new client request to disk %v", err)
+		panic(err)
+	}
+	return nil
 }
