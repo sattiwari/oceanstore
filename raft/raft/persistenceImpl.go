@@ -5,6 +5,7 @@ import (
 	"bytes"
 	"encoding/gob"
 	"errors"
+	"io"
 )
 
 // functions to assist interaction with Log entries
@@ -30,8 +31,38 @@ func CreateRaftLog(fileData *FileData) error {
 }
 
 
-func ReadRaftLog(fileData *FileData) error  {
-	
+func ReadRaftLog(fileData *FileData) ([]LogEntry, error) {
+	f, err := os.Open(fileData.fileName)
+	defer f.Close()
+	fileData.logEntryIdxToFileSizeMap = make(map[uint64]int64)
+
+	entries := make([]LogEntry, 0)
+
+	fileLocation := int64(0)
+	for err != io.EOF {
+		size, err := readStructSize(f)
+		if err != nil {
+			if err == io.EOF {
+				break
+			}
+			Error.Printf("Error reading struct size: %v at loc: %v\n", err, fileLocation)
+			fileData.isFileDescriptorOpen = false
+			return entries, err
+		}
+
+		entry, err := readLogEntry(f, size)
+		if err != nil {
+			Error.Printf("Error reading log entry: %v at loc: %v\n", err, fileLocation)
+			fileData.isFileDescriptorOpen = false
+			return entries, err
+		}
+		fileData.logEntryIdxToFileSizeMap[entry.Index] = fileLocation
+		fileLocation += INT_GOB_SIZE + int64(size)
+		entries = append(entries, *entry)
+	}
+
+	fileData.isFileDescriptorOpen = false
+	return entries, nil
 }
 
 func AppendLogEntry(fileData *FileData, entry *LogEntry) error {
@@ -124,7 +155,7 @@ func readStructSize(f *os.File) (int, error) {
 
 }
 
-func readLogentry(f *os.File, size int) (*LogEntry, error) {
+func readLogEntry(f *os.File, size int) (*LogEntry, error) {
 
 }
 
