@@ -152,7 +152,26 @@ func getLogEntryBytes(entry *LogEntry) ([]byte, error) {
 }
 
 func readStructSize(f *os.File) (int, error) {
+	// Read bytes for size value
+	b := make([]byte, INT_GOB_SIZE)
+	sizeBytes, err := f.Read(b)
+	if err != nil {
+		return -1, err
+	}
+	if int64(sizeBytes) != INT_GOB_SIZE {
+		panic("The raftlog may be corrupt, cannot proceed")
+	}
 
+	// Decode bytes as int, which is sizeof(LogEntry).
+	buff := bytes.NewBuffer(b)
+	var size int
+	dataDecoder := gob.NewDecoder(buff)
+	err = dataDecoder.Decode(&size)
+	if err != nil {
+		return -1, err
+	}
+
+	return size, nil
 }
 
 func readLogEntry(f *os.File, size int) (*LogEntry, error) {
