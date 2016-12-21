@@ -4,12 +4,20 @@ import (
 	"os"
 	"bytes"
 	"encoding/gob"
+	"errors"
 )
 
 // functions to assist interaction with Log entries
 
 func openRaftLogForWrite(fileData *FileData) error {
-
+	if fileExists(fileData.fileName) {
+		fd, err := os.OpenFile(fileData.fileName, os.O_CREATE | os.O_APPEND | os.O_WRONLY, 0600)
+		fileData.fileDescriptor = fd
+		fileData.isFileDescriptorOpen = true
+		return err
+	} else {
+		return errors.New("file does not exist")
+	}
 }
 
 func CreateRaftLog(fileData *FileData) error {
@@ -124,8 +132,15 @@ func readStableStateEntry(f *os.File, size int) (*NodeStableState, error) {
 
 }
 
-func fileExists(fileName bool) {
-
+func fileExists(fileName string) bool {
+	_, err := os.Stat(fileName)
+	if err == nil {
+		return true
+	} else if os.IsNotExist(err) {
+		return false
+	} else {
+		panic(err)
+	}
 }
 
 func getFileInfo(filename string) (int64, bool) {
