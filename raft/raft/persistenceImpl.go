@@ -133,16 +133,17 @@ func readStableStateEntry(f *os.File, size int) (*NodeStableState, error) {
 }
 
 func fileExists(fileName string) bool {
-	_, err := os.Stat(fileName)
+	_, exists := getFileInfo(fileName)
+	return exists
+}
+
+func getFileInfo(fileName string) (int64, bool) {
+	size, err := os.Stat(fileName)
 	if err == nil {
-		return true
+		return size, true
 	} else if os.IsNotExist(err) {
-		return false
+		return 0, false
 	} else {
 		panic(err)
 	}
-}
-
-func getFileInfo(filename string) (int64, bool) {
-
 }
