@@ -175,7 +175,24 @@ func readStructSize(f *os.File) (int, error) {
 }
 
 func readLogEntry(f *os.File, size int) (*LogEntry, error) {
+	b := make([]byte, size)
+	leSize, err := f.Read(b)
+	if err != nil {
+		return nil, err
+	}
+	if leSize != size {
+		panic("The raftlog may be corrupt, cannot proceed")
+	}
 
+	buff := bytes.NewBuffer(b)
+	var entry LogEntry
+	dataDecoder := gob.NewDecoder(buff)
+	err = dataDecoder.Decode(&entry)
+	if err != nil {
+		return nil, err
+	}
+
+	return &entry, nil
 }
 
 func readStableStateEntry(f *os.File, size int) (*NodeStableState, error) {
