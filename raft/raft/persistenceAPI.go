@@ -6,8 +6,6 @@ import (
 	"errors"
 )
 
-const INT_GOB_SIZE uint64 = 5
-
 type NodeStableState struct {
 	//latest term the server has been assigned, starts with 0 on boot and then increases
 	CurrentTerm uint64
@@ -105,7 +103,7 @@ func CreateMetaLog(FileData *FileData) error {
 }
 
 func (r *RaftNode) initStableStore() (bool, error) {
-	freshnode := false
+	freshNode := false
 	err := os.Mkdir(r.conf.LogPath, 0777)
 	if err != nil {
 		fmt.Println("Error in creating the log directory")
@@ -119,33 +117,55 @@ func (r *RaftNode) initStableStore() (bool, error) {
 	r.logFileDescriptor  = FileData{fileName: logFileName}
 	r.metaFileDescriptor = FileData{fileName: metaFileName}
 
-	_, raftLogExists  := getFileStats(r.logFileDescriptor.fileDescriptor)
+	logSize, raftLogExists  := getFileStats(r.logFileDescriptor.fileDescriptor)
+	r.logFileDescriptor.sizeOfFile = logSize
 
-	_, raftMetaExists := false
+	metaSize, raftMetaExists := false
+	r.metaFileDescriptor.sizeOfFile = metaSize
 
 	if raftLogExists && raftMetaExists {
-
+		Out.Println("Previous stable state exists, repopulate everything")
+		entries, err := ReadRaftLog(&r.logFileDescriptor)
+		if err != nil {
+			return freshNode, err
+		}
+		r.logCache = entries
+		err = openRaftLogForWrite(&r.logFileDescriptor)
+		if err != nil {
+			return freshNode, err
+		}
+		ss, err := ReadStableState(&r.metaFileDescriptor)
+		if err != nil {
+			return freshNode, err
+		}
+		r.stableState = *ss
 	} else if (!raftLogExists && raftMetaExists) || (raftLogExists && !raftMetaExists) {
-
+		Error.Println("Both log and meta files should exist together")
+		return errors.New("Both log and meta files should exist together")
+		return freshNode, err
 	} else {
-		freshnode = true
+		freshNode = true
 		fmt.Println("Creating new raft node with meta and log files")
 
 		err := CreateRaftLog(&r.logFileDescriptor)
 		if err !=  nil {
-			return freshnode, err
+			return freshNode, err
 		}
 
-		err = CreateMetaLog(&r.metaFileDescriptor)
+		err = CreateStableState(&r.metaFileDescriptor)
 		if err != nil {
-			return freshnode, err
+			return freshNode, err
 		}
 
-		initEntry := LogEntry{Index: 0, Term: 0, Data: []byte{0}}
+		r.stableState.OtherNodes = make([]NodeAddr, 0)
+		r.stableState.ClientRequestSequences = make(map[string]ClientReply)
+		r.logCache = make([]LogEntry, 0)
+
+		initEntry := LogEntry{Index: 0, Term: 0, Command: INIT, Data: []byte{0}}
 		r.appendLogEntry(initEntry)
 		r.SetCurrentTerm(0)
 	}
-	return freshnode, nil
+	return freshNode, nil
 }
 
 func (r *RaftNode) AddRequest(req ClientRequest, rep ClientReply) error {
