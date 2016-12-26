@@ -45,3 +45,14 @@ func (s NodeState) String() string {
 	}
 }
 
+func FsmCommandString(cmd FsmCommand) string {
+	return ""
+}
+
+func (r *RaftNode) ShowState()  {
+
+}
+
+func (r *RaftNode) PrintLogCache() {
+
+}
