@@ -3,7 +3,7 @@ package raft
 func (r *RaftNode) StartNode(request *StartNodeRequest) error {
 	r.mutex.Lock()
 	defer r.mutex.Unlock()
-	r.SetOtherNodes(request.OtherNodes)
+	r.setOtherNodes(request.OtherNodes)
 	go r.run()
 	return nil
 }
@@ -49,4 +49,8 @@ func (r *RaftNode) ClientRequest(request *ClientRequest) (ClientReply, error) {
 	reply := make(chan ClientReply)
 	r.registerClient <- ClientRequestMsg{request: request, reply: reply}
 	return <-reply, nil
+}
+
+func (r *RaftNode) printOtherNodes(ctx string)  {
+
 }
