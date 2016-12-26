@@ -64,7 +64,7 @@ type NodeAddr struct {
 	Id      string
 }
 
-func createNode(localPort int, leaderAddr *NodeAddr, conf *Config) (rp *RaftNode, err error) {
+func CreateNode(localPort int, leaderAddr *NodeAddr, conf *Config) (rp *RaftNode, err error) {
 	var r RaftNode
 	rp = &r
 	var conn net.Listener
@@ -113,7 +113,7 @@ func createNode(localPort int, leaderAddr *NodeAddr, conf *Config) (rp *RaftNode
 		return nil, err
 	}
 
-	r.SetLocalAddr(&NodeAddr{Id: r.Id, Address: conn.Addr().String()})
+	r.setLocalAddr(&NodeAddr{Id: r.Id, Address: conn.Addr().String()})
 
 	//start rpc server
 	r.RPCServer = & RaftRPCServer{rp}
@@ -154,7 +154,7 @@ func (r *RaftNode) startNodes()  {
 	}
 }
 
-func createCluster(conf *Config) ([] *RaftNode, error) {
+func CreateCluster(conf *Config) ([] *RaftNode, error) {
 	if conf == nil {
 		conf = DefaultConfig()
 	}
@@ -163,9 +163,9 @@ func createCluster(conf *Config) ([] *RaftNode, error) {
 		return nil, err
 	}
 	nodes := make([] *RaftNode, conf.ClusterSize)
-	nodes[0], err = createNode(0, nil, conf)
+	nodes[0], err = CreateNode(0, nil, conf)
 	for i := 1; i < conf.ClusterSize; i++ {
-		nodes[i], err = createNode(0, nodes[0].LeaderAddress, conf)
+		nodes[i], err = CreateNode(0, nodes[0].LeaderAddress, conf)
 		if err != nil {
 			return nil, err
 		}
