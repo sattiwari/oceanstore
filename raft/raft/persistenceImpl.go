@@ -30,7 +30,6 @@ func CreateRaftLog(fileData *FileData) error {
 	return err
 }
 
-
 func ReadRaftLog(fileData *FileData) ([]LogEntry, error) {
 	f, err := os.Open(fileData.fileName)
 	defer f.Close()
@@ -90,37 +89,34 @@ func AppendLogEntry(fileData *FileData, entry *LogEntry) error {
 	return nil
 }
 
-func TruncateLog(raftLogFd *FileData, index uint64) error {
-
-}
-
 // functions to assist interaction with stable state entries
 
 func openStableStateForWrite(fileData *FileData) error {
-
+	return nil
 }
 
-func CreateStateState(FileData *FileData) error {
-	fd, err := os.OpenFile(FileData.fileName, os.O_CREATE | os.O_APPEND | os.O_WRONLY, 0600)
-	FileData.fileDescriptor = fd
-	FileData.isFileDescriptorOpen = true
+func CreateStableState(fileData *FileData) error {
+	fd, err := os.OpenFile(fileData.fileName, os.O_CREATE | os.O_APPEND | os.O_WRONLY, 0600)
+	fileData.fileDescriptor = fd
+	fileData.isFileDescriptorOpen = true
 	return err
 }
 
-func ReadStableState(fileData *FileData) error {
 
+func ReadStableState(fileData *FileData) (NodeStableState, error) {
+	return nil, nil
 }
 
 func WriteStableState(fileData *FileData, ss NodeStableState) error {
-
+	return nil
 }
 
 func backupStableState(fileData *FileData, backupFileName string) error {
-
+	return nil
 }
 
 func copyFile(src string, des string) error {
-
+	return nil
 }
 
 // helper functions to assist read / write log entries
@@ -128,7 +124,7 @@ func copyFile(src string, des string) error {
 const INT_GOB_SIZE uint64 = 5
 
 func getStableStateBytes(ss NodeStableState) ([]byte, error) {
-
+	return nil, nil
 }
 
 func getSizeBytes(size int) ([]byte, error) {
@@ -196,7 +192,7 @@ func readLogEntry(f *os.File, size int) (*LogEntry, error) {
 }
 
 func readStableStateEntry(f *os.File, size int) (*NodeStableState, error) {
-
+	return nil, nil
 }
 
 func fileExists(fileName string) bool {
