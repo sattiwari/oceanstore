@@ -89,6 +89,10 @@ func AppendLogEntry(fileData *FileData, entry *LogEntry) error {
 	return nil
 }
 
+func TruncateLog(logFd *FileData, index uint64) error {
+	return nil
+}
+
 // functions to assist interaction with stable state entries
 
 func openStableStateForWrite(fileData *FileData) error {
