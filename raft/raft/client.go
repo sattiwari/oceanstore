@@ -77,3 +77,7 @@ func (c *Client) SendRequest(command FsmCommand, data []byte) (err error) {
 		}
 	return
 }
+
+func (c *Client) SendRequestWithReply(command FsmCommand, data []byte) (reply ClientReply, err error) {
+	return nil, nil
+}
