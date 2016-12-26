@@ -45,35 +45,6 @@ func (r *RaftNode) GetLastLogIndex() uint64 {
 	return uint64(len(r.logCache) - 1)
 }
 
-func (r *RaftNode) SetLocalAddr(addr *NodeAddr) {
-	r.ssMutex.Lock()
-	defer r.ssMutex.Unlock()
-	r.stableState.LocalAddr = *addr
-	err := WriteStableState(&r.metaFileDescriptor, r.stableState)
-	if err != nil {
-		Error.Printf("Unable to flush new local address to disk: %v\n", err)
-		panic(err)
-	}
-}
-
-func (r *RaftNode) GetLocalAddr() *NodeAddr {
-	return &r.stableState.LocalAddr
-}
-
-func (r *RaftNode) GetOtherNodes() []NodeAddr {
-	return r.stableState.OtherNodes
-}
-
-func (r *RaftNode) SetOtherNodes(nodes []NodeAddr) {
-	r.ssMutex.Lock()
-	defer r.ssMutex.Unlock()
-	r.stableState.OtherNodes = nodes
-	err := WriteStableState(&r.metaFileDescriptor, r.stableState)
-	if err != nil {
-		Error.Printf("unable to flush new other nodes to disk: %v", err)
-		panic(err)
-	}
-}
 
 func (r *RaftNode) AppendOtherNodes(other NodeAddr) {
 	r.ssMutex.Lock()
@@ -84,15 +55,6 @@ func (r *RaftNode) AppendOtherNodes(other NodeAddr) {
 		Error.Printf("Unable to flush new nodes to disk")
 		panic(err)
 	}
-}
-
-func CreateRaftLog(fileData *FileData) error {
-	fd, err := os.OpenFile(fileData.fileName, os.O_CREATE | os.O_APPEND | os.O_WRONLY, 0600)
-	fileData.fileDescriptor = fd
-	fileData.sizeOfFile = uint64(0)
-	fileData.logEntryIdxToFileSizeMap = make(map[uint64]uint64)
-	fileData.isFileDescriptorOpen = true
-	return err
 }
 
 func CreateMetaLog(FileData *FileData) error {
@@ -163,9 +125,72 @@ func (r *RaftNode) initStableStore() (bool, error) {
 
 		initEntry := LogEntry{Index: 0, Term: 0, Command: INIT, Data: []byte{0}}
 		r.appendLogEntry(initEntry)
-		r.SetCurrentTerm(0)
+		r.setCurrentTerm(0)
 	}
 	return freshNode, nil
+}
+
+func (r *RaftNode) GetCurrentTerm() uint64 {
+	return r.stableState.CurrentTerm
+}
+
+func (r *RaftNode) setCurrentTerm(newTerm uint64) {
+	r.ssMutex.Lock()
+	defer r.ssMutex.Unlock()
+
+	if r.stableState.CurrentTerm != newTerm {
+		Out.Println("Changing current term from %v to %v", r.stableState.CurrentTerm, newTerm)
+	}
+	r.stableState.CurrentTerm = newTerm
+	err := WriteStableState(&r.metaFileDescriptor, r.stableState)
+	if err != nil {
+		Error.Println("Unable to flush new term to disk %v", err)
+		panic(err)
+	}
+}
+
+func (r *RaftNode) GetVotedFor() string {
+	return r.stableState.VotedFor
+}
+
+func (r *RaftNode) setVotedFor(candidateId string) {
+
+}
+
+
+func (r *RaftNode) GetLocalAddr() *NodeAddr {
+	return &r.stableState.LocalAddr
+}
+
+func (r *RaftNode) setLocalAddr(addr *NodeAddr) {
+	r.ssMutex.Lock()
+	defer r.ssMutex.Unlock()
+	r.stableState.LocalAddr = *addr
+	err := WriteStableState(&r.metaFileDescriptor, r.stableState)
+	if err != nil {
+		Error.Printf("Unable to flush new local address to disk: %v\n", err)
+		panic(err)
+	}
+}
+
+func (r *RaftNode) GetOtherNodes() []NodeAddr {
+	return r.stableState.OtherNodes
+}
+
+func (r *RaftNode) setOtherNodes(nodes []NodeAddr) {
+	r.ssMutex.Lock()
+	defer r.ssMutex.Unlock()
+	r.stableState.OtherNodes = nodes
+	err := WriteStableState(&r.metaFileDescriptor, r.stableState)
+	if err != nil {
+		Error.Printf("unable to flush new other nodes to disk: %v", err)
+		panic(err)
+	}
+}
+
+
+func (r *RaftNode) CheckClientRequestCache(clientReq ClientRequest) (*ClientReply, bool) {
+	return nil, nil
 }
 
 func (r *RaftNode) AddRequest(req ClientRequest, rep ClientReply) error {
@@ -186,17 +211,43 @@ func (r *RaftNode) AddRequest(req ClientRequest, rep ClientReply) error {
 	return nil
 }
 
-func (r *RaftNode) SetCurrentTerm(newTerm uint64) {
-	r.ssMutex.Lock()
-	defer r.ssMutex.Unlock()
+func (r *RaftNode) getLogEntry(index uint64) *LogEntry {
+	return nil
+}
 
-	if r.stableState.CurrentTerm != newTerm {
-		Out.Println("Changing current term from %v to %v", r.stableState.CurrentTerm, newTerm)
-	}
-	r.stableState.CurrentTerm = newTerm
-	err := WriteStableState(&r.metaFileDescriptor, r.stableState)
+func (r *RaftNode) getLastLogEntry() *LogEntry {
+	return nil
+}
+
+func (r *RaftNode) getLogEntries(start uint64, end uint64) []LogEntry {
+	return nil
+}
+
+func (r *RaftNode) getLastLogIndex() uint64 {
+	return 0
+}
+
+func (r *RaftNode) getLastLogTerm() uint64 {
+	return 0
+}
+
+func (r *RaftNode) getLogTerm() uint64  {
+	return
+}
+
+func (r *RaftNode) appendLogEntry(entry LogEntry) error {
+	err := AppendLogEntry(&r.logFileDescriptor, &entry)
 	if err != nil {
-		Error.Println("Unable to flush new term to disk %v", err)
-		panic(err)
+		return err
 	}
+	//	update entry in cache
+	return nil
+}
+
+func (r *RaftNode) truncateLog(index uint64) error {
+	return nil
+}
+
+func (r *RaftNode) RemoveLogs() error {
+	return nil
 }
