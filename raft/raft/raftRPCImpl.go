@@ -40,7 +40,7 @@ func (server *RaftRPCServer) JoinImpl(request *JoinRequest, reply *JoinReply) er
 }
 
 func (server *RaftRPCServer) RequestVoteImpl(request *RequestVoteRequest, reply *RequestVoteReply) error {
-	if server.node.Testing.IsDenied(request.FromNode, server.node.GetLocalAddr()) {
+	if server.node.Testing.IsDenied(request.CandidateId, server.node.GetLocalAddr()) {
 		return ErrorTestingPolicyDenied
 	}
 	rvReply, err := server.node.RequestVote(request)
