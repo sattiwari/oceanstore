@@ -44,6 +44,14 @@ type ClientReply struct {
 	LeaderHint NodeAddr
 }
 
+func ClientRequestRPC(remoteNode *NodeAddr, request ClientRequest) (*ClientReply, error) {
+	var reply ClientReply
+	err := makeRemoteCall(remoteNode, "ClientRequestImpl", request, &reply)
+	if err != nil {
+		return nil, err
+	}
+	return &reply, nil
+}
 
 type RegisterClientRequest struct {
 	// The client address invoking request
@@ -64,15 +72,6 @@ type RegisterClientReply struct {
 func RegisterClientRPC(remoteNode *NodeAddr, request RegisterClientRequest) (*RegisterClientReply, error) {
 	var reply RegisterClientReply
 	err := makeRemoteCall(remoteNode, "RegisterClientImpl", request, &reply)
-	if err != nil {
-		return nil, err
-	}
-	return &reply, nil
-}
-
-func ClientRequestRPC(remoteNode *NodeAddr, request ClientRequest) (*ClientReply, error) {
-	var reply ClientReply
-	err := makeRemoteCall(remoteNode, "ClientRequestImpl", request, &reply)
 	if err != nil {
 		return nil, err
 	}

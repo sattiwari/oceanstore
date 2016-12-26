@@ -45,6 +45,7 @@ func JoinRPC(remoteNode *NodeAddr, fromAddr *NodeAddr) error {
 
 
 type RequestVoteRequest struct {
+	FromNode NodeAddr
 	Term uint64
 	CandidateId NodeAddr
 	CandidateLastLogTerm uint64
@@ -58,7 +59,7 @@ type RequestVoteReply struct {
 
 func (r *RaftNode) RequestVoteRPC(remoteNode *NodeAddr, request RequestVoteRequest) (*RequestVoteReply, error) {
 	var reply RequestVoteReply
-	err := makeRemoteCall(remoteNode, "requestVoteImpl", request, reply)
+	err := makeRemoteCall(remoteNode, "RequestVoteImpl", request, reply)
 	if err != nil {
 		return nil, err
 	}
