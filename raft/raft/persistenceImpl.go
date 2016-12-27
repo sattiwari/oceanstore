@@ -6,6 +6,7 @@ import (
 	"encoding/gob"
 	"errors"
 	"io"
+	"fmt"
 )
 
 // functions to assist interaction with Log entries
@@ -90,6 +91,21 @@ func AppendLogEntry(fileData *FileData, entry *LogEntry) error {
 }
 
 func TruncateLog(logFd *FileData, index uint64) error {
+	fileSize, exist := logFd.logEntryIdxToFileSizeMap(index)
+	if !exist {
+		return fmt.Errorf("log entry does not exist")
+	}
+	logFd.fileDescriptor.Close()
+	err := os.Truncate(logFd.fileName, fileSize)
+	if err != nil {
+		return nil
+	}
+	fd, err := os.OpenFile(logFd.fileName, os.O_APPEND | os.O_WRONLY, 0600)
+	logFd.fileDescriptor = fd
+	for i := index; i < uint64(len(logFd.logEntryIdxToFileSizeMap)); i++ {
+		delete(logFd.logEntryIdxToFileSizeMap, i)
+	}
+	logFd.sizeOfFile = fileSize
 	return nil
 }
 
