@@ -131,7 +131,44 @@ func CreateStableState(fileData *FileData) error {
 
 
 func ReadStableState(fileData *FileData) (NodeStableState, error) {
-	return nil, nil
+	f, err := os.Open(fileData.fileName)
+	if err != nil {
+		return nil, err
+	}
+	stat, err := f.Stat()
+	if err != nil {
+		f.Close()
+		return nil, err
+	}
+	ss, err := readStableStateEntry(f, int(stat.Size()))
+	f.Close()
+	if err != nil {
+		Debug.Println("Try debug file when we fail to read from stable state file")
+		backupFileName := fmt.Sprintf("%v.bak", fileData.fileName)
+		fbak, err := os.Open(backupFileName)
+		stat, err = fbak.Stat()
+		if err != nil {
+			fbak.Close()
+			return nil, err
+		}
+		ss, err = readStableStateEntry(f, int(stat.Size()))
+		if err != nil {
+			Error.Println("failed to read from stable state and backup file")
+			fbak.Close()
+			return nil, err
+		}
+		fbak.Close()
+		Debug.Println("read successfully from backup file; move to live copy")
+		err = os.Remove(fileData.fileName)
+		if err != nil {
+			return nil, err
+		}
+		err = copyFile(backupFileName, fileData.fileName)
+		if err != nil {
+			return nil, err
+		}
+	}
+	return ss, nil
 }
 
 func WriteStableState(fileData *FileData, ss NodeStableState) error {
