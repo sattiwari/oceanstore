@@ -244,7 +244,13 @@ func copyFile(srcFileName string, desFileName string) error {
 const INT_GOB_SIZE uint64 = 5
 
 func getStableStateBytes(ss NodeStableState) ([]byte, error) {
-	return nil, nil
+	b := new(bytes.Buffer)
+	e := gob.NewEncoder(b)
+	err  := e.Encode(ss)
+	if err != nil {
+		return nil, err
+	}
+	return b.Bytes(), nil
 }
 
 func getSizeBytes(size int) ([]byte, error) {
