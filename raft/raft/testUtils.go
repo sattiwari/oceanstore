@@ -15,8 +15,8 @@ func getLeader(nodes []*RaftNode) *RaftNode {
 		clusterSize := nodes[0].conf.ClusterSize
 		idCountMap := make(map[string]int, clusterSize)
 		for _, n := range nodes {
-			if n.leaderAddress != nil {
-				idCountMap[n.leaderAddress.id]++
+			if n.LeaderAddress != nil {
+				idCountMap[n.LeaderAddress.Id]++
 			}
 		}
 		fmt.Printf("node id to count map %v\n\n", idCountMap)
@@ -30,7 +30,7 @@ func getLeader(nodes []*RaftNode) *RaftNode {
 		}
 		if max > clusterSize / 2 {
 			for _,node := range nodes {
-				if node.leaderAddress.id == id {
+				if node.LeaderAddress.Id == id {
 					return node
 				}
 			}

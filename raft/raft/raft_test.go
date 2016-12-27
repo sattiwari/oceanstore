@@ -7,7 +7,7 @@ import (
 
 func TestNodeClusterCreation(t *testing.T)  {
 	conf := DefaultConfig()
-	nodes, err := createCluster(conf)
+	nodes, err := CreateCluster(conf)
 	leader := getLeader(nodes)
 	fmt.Print(leader, err)
 }
