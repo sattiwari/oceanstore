@@ -28,9 +28,13 @@ func (tp *TestingPolicy) IsDenied(a, b NodeAddr) bool {
 }
 
 func getCommId(a, b NodeAddr) string {
-	if a.Id < b.Id {
-		fmt.Sprintf("%v_%v", a.Id, b.Id)
-	} else {
-		fmt.Sprintf("%v_%v", b.Id, a.Id)
-	}
+	return fmt.Sprintf("%v_%v", a.Id, b.Id)
+}
+
+func (tp *TestingPolicy) RegisterPolicy(a, b NodeAddr, allowed bool) {
+
+}
+
+func (tp *TestingPolicy) PauseWorld(on bool) {
+
 }
