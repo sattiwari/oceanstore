@@ -172,6 +172,35 @@ func ReadStableState(fileData *FileData) (NodeStableState, error) {
 }
 
 func WriteStableState(fileData *FileData, ss NodeStableState) error {
+//	backup old stable state
+	backupFileName := fmt.Sprintf("%v.bak", fileData.fileName)
+	err := backupStableState(fileData, backupFileName)
+	if err != nil {
+		return errors.New("backup failed")
+	}
+	fileData.fileDescriptor.Close()
+	err = os.Truncate(fileData.fileName, 0)
+	if err != nil {
+		return err
+	}
+	fd, err := os.OpenFile(fileData.fileName, os.O_APPEND | os.O_WRONLY, 0600)
+	fileData.fileDescriptor = fd
+	bytes, err := getStableStateBytes(ss)
+	if err != nil {
+		return err
+	}
+	numBytes, err := fileData.fileDescriptor.Write(bytes)
+	if numBytes != len(bytes) {
+		panic("did not write correct number of bytes on stable state")
+	}
+	err = fileData.fileDescriptor.Sync()
+	if err != nil {
+		Error.Printf("sync failed %v", err)
+	}
+	err = os.Remove(backupFileName)
+	if err != nil || !os.IsNotExist(err) {
+		return errors.New("can not remove backup file")
+	}
 	return nil
 }
 
