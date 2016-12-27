@@ -112,7 +112,14 @@ func TruncateLog(logFd *FileData, index uint64) error {
 // functions to assist interaction with stable state entries
 
 func openStableStateForWrite(fileData *FileData) error {
-	return nil
+	if fileExists(fileData) {
+		fd, err := os.OpenFile(fileData.fileName, os.O_APPEND | os.O_WRONLY, 0600)
+		fileData.fileDescriptor = fd
+		fileData.isFileDescriptorOpen = true
+		return err
+	} else {
+		return errors.New("stable state file does not exist")
+	}
 }
 
 func CreateStableState(fileData *FileData) error {
