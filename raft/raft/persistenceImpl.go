@@ -205,6 +205,19 @@ func WriteStableState(fileData *FileData, ss NodeStableState) error {
 }
 
 func backupStableState(fileData *FileData, backupFileName string) error {
+	if fileData.isFileDescriptorOpen && fileData.fileDescriptor != nil {
+		err := fileData.fileDescriptor.Close()
+		fileData.isFileDescriptorOpen = false
+		if err != nil {
+			return err
+		}
+	}
+	err := os.Remove(backupFileName)
+	err = copyFile(fileData.fileName, backupFileName)
+	err = openStableStateForWrite(fileData)
+	if err != nil {
+		return err
+	}
 	return nil
 }
 
