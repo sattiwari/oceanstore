@@ -318,7 +318,22 @@ func readLogEntry(f *os.File, size int) (*LogEntry, error) {
 }
 
 func readStableStateEntry(f *os.File, size int) (*NodeStableState, error) {
-	return nil, nil
+	b := make([]byte, size)
+	leSize, err := f.Read(b)
+	if err != nil {
+		return nil, err
+	}
+	if leSize != size {
+		panic("The raftlog may be corrupt, cannot proceed")
+	}
+	buff := bytes.NewBuffer(b)
+	var ss NodeStableState
+	dataDecoder := gob.NewDecoder(buff)
+	err = dataDecoder.Decode(&ss)
+	if err != nil {
+		return nil, err
+	}
+	return &ss, nil
 }
 
 func fileExists(fileName string) bool {
