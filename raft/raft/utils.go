@@ -20,17 +20,9 @@ func AddrToId(addr string, length int) string {
 	return keyInt.String()
 }
 
-func (r *RaftNode) electionTimeOut() <- chan time.Time {
-	return time.After(r.conf.ElectionTimeout)
-}
-
-func (r *RaftNode) heartBeats() <- chan time.Time {
-	return time.After(r.conf.HeartbeatFrequency)
-}
-
 func makeRemoteCall(remoteNode *NodeAddr, method string, req interface{}, resp interface{}) error {
 	var err error
-	remoteAddStr := remoteNode.address
+	remoteAddStr := remoteNode.Address
 	client, ok := connectionMap[remoteAddStr]
 	if !ok {
 		client, err = rpc.Dial("tcp", remoteAddStr)
@@ -56,4 +48,23 @@ func getFileStats(filename string) (uint64, bool) {
 	} else {
 		panic(err)
 	}
+}
+
+func Exit()  {
+	Out.Println("abruptly shutting down node")
+	os.Exit(0)
+}
+
+func (r *RaftNode) hasMajority(N uint64) bool {
+	return true
+}
+
+type UInt64Slice []uint64
+
+func (p UInt64Slice) Len() uint64 {
+	return len(p)
+}
+
+func (p UInt64Slice) Swap(i, j uint64) {
+	p[i], p[j] = p[j], p[i]
 }
