@@ -179,7 +179,21 @@ func backupStableState(fileData *FileData, backupFileName string) error {
 	return nil
 }
 
-func copyFile(src string, des string) error {
+func copyFile(srcFileName string, desFileName string) error {
+	src, err := os.Open(srcFileName)
+	des, err := os.Create(desFileName)
+	if err != nil {
+		return errors.New("error opening source or destination file")
+	}
+	_, err = io.Copy(des, src)
+	if err != nil {
+		return err
+	}
+	err = src.Close()
+	err = des.Close()
+	if err != nil {
+		return errors.New("error closing source or destination file")
+	}
 	return nil
 }
 
