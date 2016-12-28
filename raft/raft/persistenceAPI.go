@@ -212,7 +212,11 @@ func (r *RaftNode) AddRequest(req ClientRequest, rep ClientReply) error {
 }
 
 func (r *RaftNode) getLogEntry(index uint64) *LogEntry {
-	return nil
+	if index < uint64(len(r.logCache)) {
+		return &r.logCache(index)
+	} else {
+		return nil
+	}
 }
 
 func (r *RaftNode) getLastLogEntry() *LogEntry {
