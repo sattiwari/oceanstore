@@ -46,13 +46,48 @@ func (s NodeState) String() string {
 }
 
 func FsmCommandString(cmd FsmCommand) string {
-	return ""
+	switch cmd {
+	case HASH_CHAIN_ADD:
+		return "hash-chain-add"
+	case HASH_CHAIN_INIT:
+		return "hash-chain-init"
+	case CLIENT_REGISTRATION:
+		return "client-registration"
+	case INIT:
+		return "init"
+	case NOOP:
+		return "noop"
+	default:
+		return "unknown"
+	}
 }
 
 func (r *RaftNode) ShowState()  {
+	fmt.Printf("Current node state:\n")
+	for i, otherNode := range r.GetOtherNodes() {
+		fmt.Printf("%v - %v", i, otherNode)
+		local := *r.GetLocalAddr()
 
+		if local == otherNode {
+			fmt.Printf(" (local node)")
+		}
+		if r.LeaderAddress != nil &&
+			otherNode == *r.LeaderAddress {
+			fmt.Printf(" (leader node)")
+		}
+		fmt.Printf("\n")
+
+	}
+	fmt.Printf("Current term: %v\n", r.GetCurrentTerm())
+	fmt.Printf("Current state: %v\n", r.State)
+	fmt.Printf("Current commit index: %v\n", r.commitIndex)
+	fmt.Printf("Current next index: %v\n", r.nextIndex)
+	fmt.Printf("Current match index: %v\n", r.matchIndex)
 }
 
 func (r *RaftNode) PrintLogCache() {
-
+	fmt.Printf("Node %v LogCache:\n", r.Id)
+	for _, entry := range r.logCache {
+		fmt.Printf(" idx:%v, term:%v\n", entry.Index, entry.Term)
+	}
 }
