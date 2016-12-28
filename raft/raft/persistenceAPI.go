@@ -154,7 +154,14 @@ func (r *RaftNode) GetVotedFor() string {
 }
 
 func (r *RaftNode) setVotedFor(candidateId string) {
-
+	r.ssMutex.Lock()
+	defer r.ssMutex.Unlock()
+	r.stableState.VotedFor = candidateId
+	err := WriteStableState(&r.metaFileDescriptor, r.stableState)
+	if err != nil {
+		Error.Println("unable to flush newly voted for to disk %v", err)
+		panic(err)
+	}
 }
 
 
