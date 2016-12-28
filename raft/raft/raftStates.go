@@ -3,6 +3,8 @@ package raft
 import (
 	"fmt"
 	"time"
+	"math"
+	"math/rand"
 )
 
 type state func() state
@@ -11,80 +13,103 @@ type state func() state
  * This method contains the logic of a Raft node in the follower state.
  */
 func (r *RaftNode) doFollower() state {
-	fmt.Println("Transitioning to follower state")
-	electionTimeOut := r.makeElectionTimeOut()
+	r.Out("Transitioning to FOLLOWER_STATE")
+	r.State = FOLLOWER_STATE
+	electionTimeout := makeElectionTimeout()
 	for {
 		select {
-		case off := <- r.gracefulExit:
-			shutdown(off)
-		case vote := <- r.requestVote:
-			fmt.Println("Request Vote Received by Follower")
-			request := vote.request
-			if r.handleCompetingRequests(vote) {
-				r.currentTerm = request.Term
-				r.VotedFor = request.CandidateId
+		case shutdown := <-r.gracefulExit:
+			if shutdown {
+				return nil
+			}
+
+		case vote := <-r.requestVote:
+			r.Out("Request vote received")
+			req := vote.request
+			currTerm := r.GetCurrentTerm()
+			candidate := req.CandidateId
+
+			if r.handleCompetingRequestVote(vote) {
+				r.setCurrentTerm(req.Term)
+				r.setVotedFor(candidate.Id)
 				r.LeaderAddress = nil
-				electionTimeOut = r.makeElectionTimeOut()
+				electionTimeout = makeElectionTimeout()
 			} else {
-				if request.Term > r.currentTerm {
-					r.currentTerm = request.Term
+				// Other candidate has a less up to date log.
+				if req.Term > currTerm {
+					r.setCurrentTerm(req.Term)
 				}
 			}
-		case _ = <- r.appendEntries:
-		case _ = <- r.registerClient:
-		case _ = <- r.clientRequest:
-		case _ = <- electionTimeOut:
-			return r.doCandidate()
+
+		case appendEnt := <-r.appendEntries:
+
+		case regClient := <-r.registerClient:
+			rep := regClient.reply
+			if r.LeaderAddress != nil {
+				rep <- RegisterClientReply{NOT_LEADER, 0, *r.LeaderAddress}
+			} else {
+				rep <- RegisterClientReply{ELECTION_IN_PROGRESS, 0, NodeAddr{"", ""}}
+			}
+
+		case <-electionTimeout:
+			return r.doCandidate
+
+		case clientReq := <-r.clientRequest:
+			rep := clientReq.reply
+			if r.LeaderAddress != nil {
+				rep <- ClientReply{NOT_LEADER, "Not leader", *r.LeaderAddress}
+			} else {
+				rep <- ClientReply{NOT_LEADER, "Not leader", NodeAddr{"", ""}}
+			}
 		}
 	}
-	return nil
 }
 
 /**
  * This method contains the logic of a Raft node in the candidate state.
  */
 func (r *RaftNode) doCandidate() state {
-	fmt.Println("Transitioning to candidate state")
-	electionResults := make(chan bool)
-	electionTimeOut := r.makeElectionTimeOut()
-
-	r.State = CANDIDATE_STATE
-	r.LeaderAddress = nil
-	r.VotedFor = r.Id
-
-	r.requestVotes(electionResults)
-
-
-	for {
-		select {
-		case off := <- r.gracefulExit:
-			shutdown(off)
-		case result := <- electionResults:
-			if result {
-				r.doLeader()
-			} else {
-				r.doFollower()
-			}
-		case vote := <- r.requestVote:
-			fmt.Println("Request vote received by candidate")
-			request := vote.request
-			if r.handleCompetingRequests(vote) {
-				r.currentTerm = request.Term
-				r.LeaderAddress = nil
-				r.VotedFor = request.CandidateId
-				r.doFollower()
-			} else {
-				if r.currentTerm < request.Term {
-					r.currentTerm = request.Term
-				}
-			}
-		case _ = r.appendEntries:
-		case _ = r.registerClient:
-		case _ = r.clientRequest:
-		case _ = electionTimeOut:
-			return r.doCandidate()
-		}
-	}
+	//fmt.Println("Transitioning to candidate state")
+	//electionResults := make(chan bool)
+	//electionTimeOut := r.makeElectionTimeout()
+	//
+	//r.State = CANDIDATE_STATE
+	//r.LeaderAddress = nil
+	//r.VotedFor = r.Id
+	//
+	//r.requestVotes(electionResults)
+	//
+	//
+	//for {
+	//	select {
+	//	case off := <- r.gracefulExit:
+	//		shutdown(off)
+	//	case result := <- electionResults:
+	//		if result {
+	//			r.doLeader()
+	//		} else {
+	//			r.doFollower()
+	//		}
+	//	case vote := <- r.requestVote:
+	//		fmt.Println("Request vote received by candidate")
+	//		request := vote.request
+	//		if r.handleCompetingRequests(vote) {
+	//			r.currentTerm = request.Term
+	//			r.LeaderAddress = nil
+	//			r.VotedFor = request.CandidateId
+	//			r.doFollower()
+	//		} else {
+	//			if r.currentTerm < request.Term {
+	//				r.currentTerm = request.Term
+	//			}
+	//		}
+	//	case _ = r.appendEntries:
+	//	case _ = r.registerClient:
+	//	case _ = r.clientRequest:
+	//	case _ = electionTimeOut:
+	//		return r.doCandidate()
+	//	}
+	//}
 	return nil
 }
 
@@ -93,33 +118,34 @@ func (r *RaftNode) doCandidate() state {
  */
 func (r *RaftNode) doLeader() state {
 	fmt.Println("Transitioning to leader state")
-	r.LeaderAddress = r.LocalAddr
-	r.VotedFor = ""
-	r.State = LEADER_STATE
-
-	beats := r.makeHeartBeats()
-	fallback := make(chan bool)
-	finish := make(chan bool, 1)
-
-	for {
-		select {
-		case off := <- r.gracefulExit:
-			shutdown(off)
-		case _ = <- r.appendEntries:
-		case _ = <- beats:
-			select {
-				case <- finish:
-				default:
-					time.After(time.Millisecond * 1)
-				}
-
-		case _ = <- fallback:
-		case _ = <- r.appendEntries:
-		case _ = <- r.registerClient:
-		case _ = <- r.clientRequest:
-
-		}
-	}
+	//r.LeaderAddress = r.LocalAddr
+	//r.VotedFor = ""
+	//r.State = LEADER_STATE
+	//
+	//beats := r.makeHeartBeats()
+	//fallback := make(chan bool)
+	//finish := make(chan bool, 1)
+	//
+	//for {
+	//	select {
+	//	case off := <- r.gracefulExit:
+	//		shutdown(off)
+	//	case _ = <- r.appendEntries:
+	//	case _ = <- beats:
+	//		select {
+	//			case <- finish:
+	//			default:
+	//				time.After(time.Millisecond * 1)
+	//			}
+	//
+	//	case _ = <- fallback:
+	//	case _ = <- r.appendEntries:
+	//	case _ = <- r.registerClient:
+	//	case _ = <- r.clientRequest:
+	//
+	//	}
+	//}
+	return nil
 }
 
 func (r *RaftNode) sendRequestFail()  {
@@ -128,15 +154,15 @@ func (r *RaftNode) sendRequestFail()  {
 
 func (r *RaftNode) sendNoop() {
 	entries := make([]LogEntry, 1)
-	entries[0] = LogEntry{r.GetLastLogIndex() + 1, r.currentTerm, make([]byte, 0)}
-	fmt.Println("NOOP logged with log index %d and term index %d", r.GetLastLogIndex() + 1, r.currentTerm)
+	entries[0] = LogEntry{r.GetLastLogIndex() + 1, r.GetCurrentTerm(), make([]byte, 0)}
+	fmt.Println("NOOP logged with log index %d and term index %d", r.GetLastLogIndex() + 1, r.GetCurrentTerm())
 	r.appendEntries
 }
 
-func (r *RaftNode) handleCompetingRequests(msg RequestVoteMsg) bool {
+func (r *RaftNode) handleCompetingRequestVote(msg RequestVoteMsg) bool {
 	request := msg.request
 	reply := msg.reply
-	currentTerm := r.currentTerm
+	currentTerm := r.GetCurrentTerm()
 	prevIndex := r.commitIndex
 	prevTerm := r.getLogTerm(prevIndex)
 
@@ -161,7 +187,7 @@ func (r *RaftNode) handleCompetingRequests(msg RequestVoteMsg) bool {
 				reply <- RequestVoteReply{currentTerm, true}
 				return true
 			} else {
-				if r.VotedFor != "" && r.State == LEADER_STATE {
+				if r.GetVotedFor() != "" && r.State == LEADER_STATE {
 					reply <- RequestVoteReply{currentTerm, false}
 					return false
 				} else {
@@ -174,20 +200,20 @@ func (r *RaftNode) handleCompetingRequests(msg RequestVoteMsg) bool {
 }
 func (r *RaftNode) requestVotes(electionResults chan bool) {
 	go func() {
-		nodes := r.otherNodes
+		nodes := r.GetOtherNodes()
 		numNodes := len(nodes)
 		votes := 1
 		for _, node := range nodes {
-			if node.id == r.Id {
+			if node.Id == r.Id {
 				continue
 			}
-			request := RequestVoteMsg{RequestVoteRequest{r.currentTerm, r.LocalAddr}}
+			request := RequestVoteMsg{RequestVoteRequest{r.GetCurrentTerm(), r.GetLocalAddr()}}
 			reply, _ := r.RequestVoteRPC(&node, request)
 			if reply == nil {
 				continue
 			}
-			if r.currentTerm < reply.Term {
-				fmt.Println("[Term outdated] Current = %d, Remote = %d", r.currentTerm, reply.Term)
+			if r.GetCurrentTerm() < reply.Term {
+				fmt.Println("[Term outdated] Current = %d, Remote = %d", r.GetCurrentTerm(), reply.Term)
 				electionResults <-  false
 				return
 			}
@@ -226,8 +252,9 @@ func (r *RaftNode) sendAppendEntries(entries []LogEntry) (fallBack, sentToMajori
 	return
 }
 
-func (r *RaftNode) makeElectionTimeOut() <- chan time.Time {
-	return time.After(r.conf.ElectionTimeout)
+func makeElectionTimeout() <- chan time.Time {
+	millis := rand.Int()%400 + 150
+	return time.After(time.Millisecond * time.Duration(millis))
 }
 
 func (r *RaftNode) makeHeartBeats() <- chan time.Time {
