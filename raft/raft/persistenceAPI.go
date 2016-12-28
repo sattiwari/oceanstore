@@ -220,23 +220,32 @@ func (r *RaftNode) getLogEntry(index uint64) *LogEntry {
 }
 
 func (r *RaftNode) getLastLogEntry() *LogEntry {
-	return nil
+	return r.getLogEntry(r.getLastLogIndex())
 }
 
 func (r *RaftNode) getLogEntries(start uint64, end uint64) []LogEntry {
-	return nil
+	if start < uint64(len(r.logCache)) {
+		if end > uint64(len(r.logCache)) {
+			end = uint64(len(r.logCache))
+		} else {
+			end++
+		}
+		return r.logCache[start:end]
+	} else {
+		return make([]LogEntry, 0)
+	}
 }
 
 func (r *RaftNode) getLastLogIndex() uint64 {
-	return 0
+	return uint64(len(r.logCache)) - 1
 }
 
 func (r *RaftNode) getLastLogTerm() uint64 {
-	return 0
+	return r.getLastLogEntry().Term
 }
 
-func (r *RaftNode) getLogTerm() uint64  {
-	return
+func (r *RaftNode) getLogTerm(index uint64) uint64  {
+	return r.getLogEntry(index).Term
 }
 
 func (r *RaftNode) appendLogEntry(entry LogEntry) error {
@@ -244,14 +253,34 @@ func (r *RaftNode) appendLogEntry(entry LogEntry) error {
 	if err != nil {
 		return err
 	}
-	//	update entry in cache
+	r.logCache = append(r.logCache, entry)
 	return nil
 }
 
+// truncate file to remove everything at index and after it
 func (r *RaftNode) truncateLog(index uint64) error {
+	err := TruncateLog(&r.logFileDescriptor, index)
+	if err != nil {
+		return err
+	}
+	r.logCache = r.logCache[:index]
 	return nil
 }
 
 func (r *RaftNode) RemoveLogs() error {
+	r.logFileDescriptor.fileDescriptor.Close()
+	r.logFileDescriptor.isFileDescriptorOpen = false
+	err := os.Remove(r.logFileDescriptor.fileName)
+	if err != nil {
+		Error.Println("unable to remove raft log file")
+		return err
+	}
+	r.metaFileDescriptor.fileDescriptor.Close()
+	r.metaFileDescriptor.isFileDescriptorOpen = false
+	err = os.Remove(r.metaFileDescriptor.fileName)
+	if err != nil {
+		Error.Println("unable to remove meta file")
+		return err
+	}
 	return nil
 }
