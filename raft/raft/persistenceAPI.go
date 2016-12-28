@@ -190,7 +190,13 @@ func (r *RaftNode) setOtherNodes(nodes []NodeAddr) {
 
 
 func (r *RaftNode) CheckClientRequestCache(clientReq ClientRequest) (*ClientReply, bool) {
-	return nil, nil
+	uniqueId := fmt.Sprintf("%v-%v", clientReq.ClientId, clientReq.SequenceNumber)
+	val, ok := r.stableState.ClientRequestSequences[uniqueId]
+	if ok {
+		return &val, ok
+	} else {
+		return nil, ok
+	}
 }
 
 func (r *RaftNode) AddRequest(req ClientRequest, rep ClientReply) error {
