@@ -8,13 +8,13 @@ import (
 var ErrorTestingPolicyDenied = errors.New("testing policy has denied this communication")
 
 type TestingPolicy struct {
-	PauseWorld bool
-	RpcPolicy  map[string]bool
+	pauseWorld bool
+	rpcPolicy  map[string]bool
 }
 
 func NewTesting() *TestingPolicy {
 	var tp TestingPolicy
-	tp.RpcPolicy = make(map[string]bool)
+	tp.rpcPolicy = make(map[string]bool)
 	return &tp
 }
 
@@ -23,7 +23,7 @@ func (tp *TestingPolicy) IsDenied(a, b NodeAddr) bool {
 		return true
 	}
 	commStr := getCommId(a, b)
-	denied, exists := tp.RpcPolicy[commStr]
+	denied, exists := tp.rpcPolicy[commStr]
 	return exists && denied
 }
 
@@ -32,9 +32,10 @@ func getCommId(a, b NodeAddr) string {
 }
 
 func (tp *TestingPolicy) RegisterPolicy(a, b NodeAddr, allowed bool) {
-
+	commStr := getCommId(a, b)
+	tp.rpcPolicy[commStr] = allowed
 }
 
 func (tp *TestingPolicy) PauseWorld(on bool) {
-
+	tp.pauseWorld = on
 }
