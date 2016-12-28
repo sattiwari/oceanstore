@@ -31,6 +31,7 @@ func (r *RaftNode) processLog(entry LogEntry) ClientReply {
 			response = fmt.Sprintf("%v", r.hash)
 		}
 	default:
+		response = "success"
 	}
 
 	reply := ClientReply{Status: status, Response: response, LeaderHint: r.GetLocalAddr()}

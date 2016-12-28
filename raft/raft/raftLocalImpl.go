@@ -1,5 +1,7 @@
 package raft
 
+import "fmt"
+
 func (r *RaftNode) StartNode(request *StartNodeRequest) error {
 	r.mutex.Lock()
 	defer r.mutex.Unlock()
@@ -52,5 +54,9 @@ func (r *RaftNode) ClientRequest(request *ClientRequest) (ClientReply, error) {
 }
 
 func (r *RaftNode) printOtherNodes(ctx string)  {
-
+	otherStr := fmt.Sprintf("%v (%v) r.OtherNodes = [", ctx, r.Id)
+	for _, otherNode := range r.GetOtherNodes() {
+		otherStr += fmt.Sprintf("%v,", otherNode.Id)
+	}
+	Out.Printf(otherStr[:len(otherStr)-1] + "]\n")
 }
