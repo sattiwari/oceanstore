@@ -79,5 +79,26 @@ func (c *Client) SendRequest(command FsmCommand, data []byte) (err error) {
 }
 
 func (c *Client) SendRequestWithReply(command FsmCommand, data []byte) (reply ClientReply, err error) {
+	request := ClientRequest{c.Id, c.SeqNum, command, data}
+	c.SeqNum += 1
+	retries := 0
+	for retries < MAX_RETRIES {
+		reply, err = ClientRequestRPC(&c.Leader, request)
+		switch reply.Status {
+		case OK:
+			Debug.Println("%v is the leader", c.Leader)
+			Out.Println("Request returned %v", reply.Response)
+			return reply, nil
+		case REQUEST_FAILED:
+			Error.Println("request failed %v", reply.Response)
+			request++
+			return reply, nil
+		case NOT_LEADER:
+			c.Leader = reply.LeaderHint
+		case ELECTION_IN_PROGRESS:
+			c.Leader = reply.LeaderHint
+			time.Sleep(time.Millisecond * 200)
+		}
+	}
 	return nil, nil
 }
