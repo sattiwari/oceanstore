@@ -42,6 +42,56 @@ func (r *RaftNode) doFollower() state {
 			}
 
 		case appendEnt := <-r.appendEntries:
+			req := appendEnt.request
+			rep := appendEnt.reply
+			currTerm := r.GetCurrentTerm()
+
+			if req.Term < currTerm {
+				r.Out("Rejected heartbeat from %v because of terms", req.LeaderId.Id)
+				rep <- AppendEntriesReply{currTerm, false}
+			} else {
+				r.LeaderAddress = &req.LeaderId
+				r.setCurrentTerm(req.Term)
+				r.setVotedFor("")
+
+				entry := r.getLogEntry(req.PrevLogIndex)
+				if entry == nil || entry.Term != req.PrevLogTerm {
+					r.Out("Rejected heartbeat from %v because of miss", req.LeaderId.Id)
+					rep <- AppendEntriesReply{currTerm, false}
+				} else {
+					if req.PrevLogIndex+1 > r.commitIndex {
+						r.truncateLog(req.PrevLogIndex + 1)
+					} else {
+						r.truncateLog(req.PrevLogIndex + 1)
+						r.commitIndex = req.PrevLogIndex
+					}
+
+					if len(req.Entries) > 0 {
+						for i := range req.Entries {
+							r.appendLogEntry(req.Entries[i])
+						}
+					}
+
+					if req.LeaderCommit > r.commitIndex {
+						r.commitIndex = uint64(math.Min(float64(req.LeaderCommit), float64(r.getLastLogIndex())))
+					}
+
+					// Calls process log from lastApplied until commit index.
+					if r.lastApplied < r.commitIndex {
+						i := r.lastApplied
+						if r.lastApplied != 0 {
+							i++
+						}
+						for ; i <= r.commitIndex; i++ {
+							_ = r.processLog(*r.getLogEntry(i))
+						}
+						r.lastApplied = r.commitIndex
+					}
+
+					rep <- AppendEntriesReply{currTerm, true}
+				}
+			}
+			electionTimeout = makeElectionTimeout()
 
 		case regClient := <-r.registerClient:
 			rep := regClient.reply
