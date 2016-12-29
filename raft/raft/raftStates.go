@@ -5,6 +5,7 @@ import (
 	"time"
 	"math"
 	"math/rand"
+	"strconv"
 )
 
 type state func() state
@@ -204,34 +205,137 @@ func (r *RaftNode) doCandidate() state {
  * This method contains the logic of a Raft node in the leader state.
  */
 func (r *RaftNode) doLeader() state {
-	fmt.Println("Transitioning to leader state")
-	//r.LeaderAddress = r.LocalAddr
-	//r.VotedFor = ""
-	//r.State = LEADER_STATE
-	//
-	//beats := r.makeHeartBeats()
-	//fallback := make(chan bool)
-	//finish := make(chan bool, 1)
-	//
-	//for {
-	//	select {
-	//	case off := <- r.gracefulExit:
-	//		shutdown(off)
-	//	case _ = <- r.appendEntries:
-	//	case _ = <- beats:
-	//		select {
-	//			case <- finish:
-	//			default:
-	//				time.After(time.Millisecond * 1)
-	//			}
-	//
-	//	case _ = <- fallback:
-	//	case _ = <- r.appendEntries:
-	//	case _ = <- r.registerClient:
-	//	case _ = <- r.clientRequest:
-	//
-	//	}
-	//}
+	r.Out("Transitioning to LEADER_STATE")
+	r.State = LEADER_STATE
+	r.setVotedFor("")
+	r.LeaderAddress = r.GetLocalAddr()
+	beats := r.makeHeartBeats()
+	fallback := make(chan bool)
+	finish := make(chan bool, 1)
+
+	for _, n := range r.GetOtherNodes() {
+		r.nextIndex[n.Id] = r.getLastLogIndex() + 1
+	}
+
+	r.sendNoop()
+	r.Out("before noop The channel has %v\n", finish)
+	finish <- true
+	r.Out("The channel has %v\n", finish)
+	for {
+		select {
+
+		case shutdown := <-r.gracefulExit:
+			if shutdown {
+				return nil
+			}
+
+		case <-beats:
+				select {
+				case <-finish:
+					r.sendHeartBeats(fallback, finish)
+					beats = r.makeHeartBeats()
+				default:
+					beats = time.After(time.Millisecond * 1)
+				}
+		case <-fallback:
+			r.Out("heartbeat fallback")
+			r.sendRequestFail()
+			return r.doFollower
+
+		case appendEnt := <-r.appendEntries:
+			req := appendEnt.request
+			rep := appendEnt.reply
+			currTerm := r.GetCurrentTerm()
+			leader := req.LeaderId
+			r.Out("Recieved heartbeat from %v", leader.Id)
+
+			if req.Term < currTerm {
+				rep <- AppendEntriesReply{currTerm, false}
+			} else {
+				r.LeaderAddress = &leader
+				r.setCurrentTerm(req.Term)
+				r.setVotedFor("")
+				rep <- AppendEntriesReply{currTerm, true}
+				r.sendRequestFail()
+				r.Out("appendEnt fallback")
+				return r.doFollower
+			}
+
+		case vote := <-r.requestVote:
+			r.Debug("request vote leader: entered\n")
+			req := vote.request
+			candidate := req.CandidateId
+			currTerm := r.GetCurrentTerm()
+			if r.handleCompetingRequestVote(vote) {
+				r.setCurrentTerm(req.Term)
+				r.setVotedFor(candidate.Id)
+				r.LeaderAddress = nil
+				r.sendRequestFail()
+				r.Out("vote fallback by %v", candidate.Id)
+				return r.doFollower
+			} else {
+				// Other candidate has a less up to date log.
+				if req.Term > currTerm {
+					r.setCurrentTerm(req.Term)
+				}
+			}
+
+		case regClient := <-r.registerClient:
+			req := regClient.request
+			rep := regClient.reply
+
+			entries := make([]LogEntry, 1)
+			entries[0] = LogEntry{r.getLastLogIndex() + 1, r.GetCurrentTerm(), CLIENT_REGISTRATION, []byte(req.FromNode.Id), ""}
+			r.appendLogEntry(entries[0])
+
+			fallback, maj := r.sendAppendEntries(entries)
+
+			if fallback {
+				if maj {
+					rep <- RegisterClientReply{OK, r.getLastLogIndex(), *r.LeaderAddress}
+				} else {
+					rep <- RegisterClientReply{REQUEST_FAILED, 0, *r.LeaderAddress}
+				}
+				r.sendRequestFail()
+				r.LeaderAddress = nil
+				r.Out("reg client fallback by %v")
+				return r.doFollower
+			}
+
+			if !maj {
+				rep <- RegisterClientReply{REQUEST_FAILED, 0, *r.LeaderAddress}
+				r.truncateLog(r.getLastLogIndex())
+			} else {
+				rep <- RegisterClientReply{OK, r.getLastLogIndex(), *r.LeaderAddress}
+			}
+
+		case clientReq := <-r.clientRequest:
+			req := clientReq.request
+			rep := clientReq.reply
+		//checking that it's registered
+			entry := r.getLogEntry(req.ClientId)
+			if entry.Command == CLIENT_REGISTRATION { 
+
+				r.Out("The client is registered.")
+				if false {
+				//	need to think about oceanstore case here
+				} else {
+					entries := make([]LogEntry, 1)
+					//Fill in the LogEntry based on the request data
+					entries[0] = LogEntry{r.getLastLogIndex() + 1, r.GetCurrentTerm(), req.Command, req.Data, strconv.FormatUint(req.SequenceNumber, 10)}
+					r.appendLogEntry(entries[0])
+
+					r.requestMutex.Lock()
+					r.requestMap[r.getLastLogIndex()] = clientReq
+					r.requestMutex.Unlock()
+				}
+			} else {
+				rep <- ClientReply{REQUEST_FAILED, "client is not registered.", *r.LeaderAddress}
+			}
+
+		}
+	}
+
 	return nil
 }
 
