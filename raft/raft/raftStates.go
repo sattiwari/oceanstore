@@ -125,47 +125,78 @@ func (r *RaftNode) doFollower() state {
  In some situations an election will result in a split vote. In this case the term will end with no leader; a new term (with a new election)
  */
 func (r *RaftNode) doCandidate() state {
-	//fmt.Println("Transitioning to candidate state")
-	//electionResults := make(chan bool)
-	//electionTimeOut := r.makeElectionTimeout()
-	//
-	//r.State = CANDIDATE_STATE
-	//r.LeaderAddress = nil
-	//r.VotedFor = r.Id
-	//
-	//r.requestVotes(electionResults)
-	//
-	//
-	//for {
-	//	select {
-	//	case off := <- r.gracefulExit:
-	//		shutdown(off)
-	//	case result := <- electionResults:
-	//		if result {
-	//			r.doLeader()
-	//		} else {
-	//			r.doFollower()
-	//		}
-	//	case vote := <- r.requestVote:
-	//		fmt.Println("Request vote received by candidate")
-	//		request := vote.request
-	//		if r.handleCompetingRequests(vote) {
-	//			r.currentTerm = request.Term
-	//			r.LeaderAddress = nil
-	//			r.VotedFor = request.CandidateId
-	//			r.doFollower()
-	//		} else {
-	//			if r.currentTerm < request.Term {
-	//				r.currentTerm = request.Term
-	//			}
-	//		}
-	//	case _ = r.appendEntries:
-	//	case _ = r.registerClient:
-	//	case _ = r.clientRequest:
-	//	case _ = electionTimeOut:
-	//		return r.doCandidate()
-	//	}
-	//}
+	r.Out("Transitioning to CANDIDATE_STATE")
+
+	r.setCurrentTerm(r.GetCurrentTerm() + 1)
+	r.State = CANDIDATE_STATE
+	r.LeaderAddress = nil
+	r.setVotedFor(r.Id)
+
+	electionResults := make(chan bool)
+	electionTimeout := makeElectionTimeout()
+	r.requestVotes(electionResults)
+
+	for {
+		select {
+		case shutdown := <-r.gracefulExit:
+			if shutdown {
+				return nil
+			}
+
+		case election := <-electionResults:
+			if election {
+				return r.doLeader
+			} else {
+				return r.doFollower
+			}
+
+		case vote := <-r.requestVote:
+			req := vote.request
+			candidate := req.CandidateId
+			currTerm := r.GetCurrentTerm()
+			if r.handleCompetingRequestVote(vote) {
+				r.setCurrentTerm(req.Term)
+				r.setVotedFor(candidate.Id)
+				r.LeaderAddress = nil
+				electionTimeout = makeElectionTimeout()
+				return r.doFollower
+			} else {
+				// Other candidate has a less up to date log.
+				if req.Term > currTerm {
+					r.setCurrentTerm(req.Term)
+				}
+			}
+
+		case appendEnt := <-r.appendEntries:
+			req := appendEnt.request
+			rep := appendEnt.reply
+			currTerm := r.GetCurrentTerm()
+			leader := req.LeaderId
+			r.Out("Recieved heartbeat from %v", leader.Id)
+
+			if req.Term >= currTerm {
+				r.LeaderAddress = &leader
+				r.setCurrentTerm(req.Term)
+				r.setVotedFor("")
+				rep <- AppendEntriesReply{currTerm, true}
+				electionTimeout = makeElectionTimeout()
+				return r.doFollower
+			} else {
+				rep <- AppendEntriesReply{currTerm, false}
+			}
+
+		case regClient := <-r.registerClient:
+			rep := regClient.reply
+			rep <- RegisterClientReply{ELECTION_IN_PROGRESS, 0, NodeAddr{"", ""}}
+		case clientReq := <-r.clientRequest:
+			rep := clientReq.reply
+			rep <- ClientReply{ELECTION_IN_PROGRESS, "Not leader", NodeAddr{"", ""}}
+
+		case <-electionTimeout:
+		//It becomes a candidate again after the timeout.
+			return r.doCandidate
+		}
+	}
 	return nil
 }
 
