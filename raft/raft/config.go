@@ -8,7 +8,10 @@ import (
 type Config struct {
 	ElectionTimeout    time.Duration
 	HeartbeatFrequency time.Duration
+
+	//cluster contains several servers, typically 5, which allows system to tolerate 2 failures
 	ClusterSize        int
+
 	NodeIdSize         int
 	LogPath            string
 }

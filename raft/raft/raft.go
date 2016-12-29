@@ -22,6 +22,8 @@ type RaftNode struct {
 	Id                 string
 	Listener           net.Listener
 	listenPort         uint64
+
+	//At any given time each server is in one of three states: leader, follower, or candidate.
 	State              NodeState
 	LeaderAddress      *NodeAddr
 

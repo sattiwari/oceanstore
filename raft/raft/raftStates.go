@@ -11,6 +11,7 @@ type state func() state
 
 /**
  * This method contains the logic of a Raft node in the follower state.
+ Followers are passive: they issue no requests on their own but simply respond to requests from leaders and candidates.
  */
 func (r *RaftNode) doFollower() state {
 	r.Out("Transitioning to FOLLOWER_STATE")
@@ -23,6 +24,7 @@ func (r *RaftNode) doFollower() state {
 				return nil
 			}
 
+		//	response to candidate request for votes
 		case vote := <-r.requestVote:
 			r.Out("Request vote received")
 			req := vote.request
@@ -41,6 +43,7 @@ func (r *RaftNode) doFollower() state {
 				}
 			}
 
+		//	response for leader's heartbeat message
 		case appendEnt := <-r.appendEntries:
 			req := appendEnt.request
 			rep := appendEnt.reply
@@ -93,6 +96,7 @@ func (r *RaftNode) doFollower() state {
 			}
 			electionTimeout = makeElectionTimeout()
 
+		//	if a client contacts a follower, the follower redirects it to the leader
 		case regClient := <-r.registerClient:
 			rep := regClient.reply
 			if r.LeaderAddress != nil {
@@ -117,6 +121,8 @@ func (r *RaftNode) doFollower() state {
 
 /**
  * This method contains the logic of a Raft node in the candidate state.
+ This state is used to elect a new leader. If a candidate wins the election, then it serves as leader for the rest of the term.
+ In some situations an election will result in a split vote. In this case the term will end with no leader; a new term (with a new election)
  */
 func (r *RaftNode) doCandidate() state {
 	//fmt.Println("Transitioning to candidate state")

@@ -6,6 +6,10 @@ import (
 	"errors"
 )
 
+/*
+Raft divides time into terms of arbitrary length. Terms act as a logical clock in Raft, they allow servers to detect obsolete information such as stale leaders.
+ */
+
 type NodeStableState struct {
 	//latest term the server has been assigned, starts with 0 on boot and then increases
 	CurrentTerm uint64
