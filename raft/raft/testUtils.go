@@ -3,6 +3,7 @@ package raft
 import (
 	"fmt"
 	"time"
+	"math/rand"
 )
 
 //TODO - move away the code to find majority element
@@ -38,4 +39,22 @@ func getLeader(nodes []*RaftNode) *RaftNode {
 		it++
 	}
 	return leader
+}
+
+func randSeq(n int) string {
+	var letters = []rune("abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ")
+	b := make([]rune, n)
+	for i := range b {
+		b[i] = letters[rand.Intn(len(letters))]
+	}
+	return string(b)
+}
+
+func checkNodes(nodes []*RaftNode, clusterSize int) bool {
+	for _, n := range nodes {
+		if len(n.GetOtherNodes()) != clusterSize {
+			return false
+		}
+	}
+	return true
 }
