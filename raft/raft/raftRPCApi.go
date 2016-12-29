@@ -67,6 +67,15 @@ func (r *RaftNode) RequestVoteRPC(remoteNode *NodeAddr, request RequestVoteReque
 }
 
 //Invoked by leader to replicate log entries. Also, used as heartbeat between leaders and followers.
+/*
+Log Matching Proprty - If two entries in different logs have the same index and term, then the logs are identical in all preceding entries.
+This property is guaranteed by a simple consistency check performed by AppendEntries. When sending an AppendEntries RPC,
+the leader includes the index and term of the entry in its log that immediately precedes the new entries.
+If the follower does not find an entry in its log with the same index and term, then it refuses the new entries.
+The consistency check acts as an induction step: the initial empty state of the logs satisfies the Log Matching Property,
+and the consistency check preserves the Log Matching Property whenever logs are extended. As a result, whenever AppendEntries returns successfully,
+the leader knows that the follower’s log is identical to its own log up through the new entries.
+ */
 type AppendEntriesRequest struct {
 	//	leader's term
 	Term uint64

@@ -215,6 +215,12 @@ func (r *RaftNode) sendNoop() {
 	r.appendEntries
 }
 
+/*
+The RequestVote RPC includes information about the candidate’s log, and the voter denies its vote if its own log is more up-to-date than that of the candidate.
+Raft determines which of two logs is more up-to-date by comparing the index and term of the last entries in the logs.
+If the logs have last entries with different terms, then the log with the later term is more up-to-date. If the logs end with the same term,
+then whichever log is longer is more up-to-date.
+ */
 func (r *RaftNode) handleCompetingRequestVote(msg RequestVoteMsg) bool {
 	request := msg.request
 	reply := msg.reply
