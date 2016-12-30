@@ -55,7 +55,7 @@ func (c *Client) SendRequest(command FsmCommand, data []byte) (err error) {
 
 	LOOP:
 		for retries < MAX_RETRIES {
-			reply, err = ClientRequestRPC(c.Leader, request)
+			reply, err = ClientRequestRPC(&c.Leader, request)
 			if err != nil {
 				return
 			}
@@ -78,7 +78,7 @@ func (c *Client) SendRequest(command FsmCommand, data []byte) (err error) {
 	return
 }
 
-func (c *Client) SendRequestWithReply(command FsmCommand, data []byte) (reply ClientReply, err error) {
+func (c *Client) SendRequestWithReply(command FsmCommand, data []byte) (reply *ClientReply, err error) {
 	request := ClientRequest{c.Id, c.SeqNum, command, data}
 	c.SeqNum += 1
 	retries := 0
@@ -91,7 +91,7 @@ func (c *Client) SendRequestWithReply(command FsmCommand, data []byte) (reply Cl
 			return reply, nil
 		case REQUEST_FAILED:
 			Error.Println("request failed %v", reply.Response)
-			request++
+			retries++
 			return reply, nil
 		case NOT_LEADER:
 			c.Leader = reply.LeaderHint

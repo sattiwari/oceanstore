@@ -83,10 +83,10 @@ func (r *RaftNode) initStableStore() (bool, error) {
 	r.logFileDescriptor  = FileData{fileName: logFileName}
 	r.metaFileDescriptor = FileData{fileName: metaFileName}
 
-	logSize, raftLogExists  := getFileStats(r.logFileDescriptor.fileDescriptor)
+	logSize, raftLogExists  := getFileStats(r.logFileDescriptor.fileName)
 	r.logFileDescriptor.sizeOfFile = logSize
 
-	metaSize, raftMetaExists := false
+	metaSize, raftMetaExists := getFileStats(r.metaFileDescriptor.fileName)
 	r.metaFileDescriptor.sizeOfFile = metaSize
 
 	if raftLogExists && raftMetaExists {
@@ -107,7 +107,7 @@ func (r *RaftNode) initStableStore() (bool, error) {
 		r.stableState = *ss
 	} else if (!raftLogExists && raftMetaExists) || (raftLogExists && !raftMetaExists) {
 		Error.Println("Both log and meta files should exist together")
-		return errors.New("Both log and meta files should exist together")
+		//return errors.New("Both log and meta files should exist together")
 		return freshNode, err
 	} else {
 		freshNode = true
@@ -210,11 +210,10 @@ func (r *RaftNode) CheckClientRequestCache(clientReq ClientRequest) (*ClientRepl
 	}
 }
 
-func (r *RaftNode) AddRequest(req ClientRequest, rep ClientReply) error {
+func (r *RaftNode) AddRequest(uniqueID string, rep ClientReply) error {
 	r.ssMutex.Lock()
 	defer r.ssMutex.Unlock()
 
-	uniqueID := fmt.Sprintf("%v-%v", req.ClientId, req.SequenceNumber)
 	_, ok := r.stableState.ClientRequestSequences[uniqueID]
 	if ok {
 		return errors.New("Request with same client and sequence number exists")
@@ -230,7 +229,7 @@ func (r *RaftNode) AddRequest(req ClientRequest, rep ClientReply) error {
 
 func (r *RaftNode) getLogEntry(index uint64) *LogEntry {
 	if index < uint64(len(r.logCache)) {
-		return &r.logCache(index)
+		return &r.logCache[index]
 	} else {
 		return nil
 	}

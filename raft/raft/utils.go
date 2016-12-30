@@ -3,7 +3,6 @@ package raft
 import (
 	"math/big"
 	"crypto/sha1"
-	"time"
 	"net/rpc"
 	"fmt"
 	"os"

@@ -34,7 +34,7 @@ func (r *RaftNode) processLog(entry LogEntry) ClientReply {
 		response = "success"
 	}
 
-	reply := ClientReply{Status: status, Response: response, LeaderHint: r.GetLocalAddr()}
+	reply := ClientReply{Status: status, Response: response, LeaderHint: *r.GetLocalAddr()}
 
 	if entry.CacheId != "" {
 		r.AddRequest(entry.CacheId, reply)
@@ -44,7 +44,6 @@ func (r *RaftNode) processLog(entry LogEntry) ClientReply {
 	msg, exists := r.requestMap[entry.Index]
 	if exists {
 		msg.reply <-reply
-		r.AddRequest(*msg.request, reply)
 		delete(r.requestMap, entry.Index)
 	}
 	r.requestMutex.Unlock()

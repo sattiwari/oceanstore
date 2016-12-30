@@ -22,7 +22,7 @@ func OpenListener() (net.Listener, int, error) {
 			time.Sleep(time.Millisecond * 100)
 			return OpenListener()
 		} else {
-			return err, -1, err
+			return nil, -1, err
 		}
 	}
 	return conn, port, err
@@ -30,7 +30,7 @@ func OpenListener() (net.Listener, int, error) {
 
 func addrInUse(err error) bool {
 	if opErr, ok := err.(*net.OpError); ok {
-		if osErr, ok := opErr.Err.(os.SyscallError); ok {
+		if osErr, ok := opErr.Err.(*os.SyscallError); ok {
 			return osErr.Err == syscall.EADDRINUSE
 		}
 	}

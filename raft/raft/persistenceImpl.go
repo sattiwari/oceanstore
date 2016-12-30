@@ -34,11 +34,11 @@ func CreateRaftLog(fileData *FileData) error {
 func ReadRaftLog(fileData *FileData) ([]LogEntry, error) {
 	f, err := os.Open(fileData.fileName)
 	defer f.Close()
-	fileData.logEntryIdxToFileSizeMap = make(map[uint64]int64)
+	fileData.logEntryIdxToFileSizeMap = make(map[uint64]uint64)
 
 	entries := make([]LogEntry, 0)
 
-	fileLocation := int64(0)
+	fileLocation := uint64(0)
 	for err != io.EOF {
 		size, err := readStructSize(f)
 		if err != nil {
@@ -57,7 +57,7 @@ func ReadRaftLog(fileData *FileData) ([]LogEntry, error) {
 			return entries, err
 		}
 		fileData.logEntryIdxToFileSizeMap[entry.Index] = fileLocation
-		fileLocation += INT_GOB_SIZE + int64(size)
+		fileLocation += INT_GOB_SIZE + uint64(size)
 		entries = append(entries, *entry)
 	}
 
@@ -70,7 +70,7 @@ func AppendLogEntry(fileData *FileData, entry *LogEntry) error {
 	if err != nil {
 		return err
 	}
-	size , err := getSizeBytes(logBytes)
+	size , err := getSizeBytes(len(logBytes))
 	if err != nil {
 		return err
 	}
@@ -81,7 +81,7 @@ func AppendLogEntry(fileData *FileData, entry *LogEntry) error {
 	if numOfBytesWritten != len(logBytes) {
 		panic("did not write correct number of bytes")
 	}
-	fileData.sizeOfFile += numOfBytesWritten
+	fileData.sizeOfFile += uint64(numOfBytesWritten)
 	err = fileData.fileDescriptor.Sync()
 	if err != nil {
 		return err
@@ -91,7 +91,7 @@ func AppendLogEntry(fileData *FileData, entry *LogEntry) error {
 }
 
 func TruncateLog(logFd *FileData, index uint64) error {
-	fileSize, exist := logFd.logEntryIdxToFileSizeMap(index)
+	fileSize, exist := logFd.logEntryIdxToFileSizeMap[index]
 	if !exist {
 		return fmt.Errorf("log entry does not exist")
 	}
@@ -112,7 +112,7 @@ func TruncateLog(logFd *FileData, index uint64) error {
 // functions to assist interaction with stable state entries
 
 func openStableStateForWrite(fileData *FileData) error {
-	if fileExists(fileData) {
+	if fileExists(fileData.fileName) {
 		fd, err := os.OpenFile(fileData.fileName, os.O_APPEND | os.O_WRONLY, 0600)
 		fileData.fileDescriptor = fd
 		fileData.isFileDescriptorOpen = true
@@ -130,7 +130,7 @@ func CreateStableState(fileData *FileData) error {
 }
 
 
-func ReadStableState(fileData *FileData) (NodeStableState, error) {
+func ReadStableState(fileData *FileData) (*NodeStableState, error) {
 	f, err := os.Open(fileData.fileName)
 	if err != nil {
 		return nil, err
