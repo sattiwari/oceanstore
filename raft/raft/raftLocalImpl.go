@@ -8,7 +8,8 @@ import (
 func (r *RaftNode) StartNode(request *StartNodeRequest) error {
 	r.mutex.Lock()
 	defer r.mutex.Unlock()
-	r.setOtherNodes(request.OtherNodes)
+	r.SetOtherNodes(request.OtherNodes)
+	r.printOtherNodes("StartNode")
 	go r.run()
 	return nil
 }

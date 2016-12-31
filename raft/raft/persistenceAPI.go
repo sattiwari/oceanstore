@@ -71,14 +71,16 @@ func CreateMetaLog(FileData *FileData) error {
 func (r *RaftNode) initStableStore() (bool, error) {
 	freshNode := false
 	err := os.Mkdir(r.conf.LogPath, 0777)
-	if err != nil {
-		fmt.Println("Error in creating the log directory")
-	} else {
-		fmt.Println("Created log directory %v\n", r.conf.LogPath)
+	if err == nil {
+		Out.Printf("Created log directory: %v\n", r.conf.LogPath)
+	}
+	if err != nil && !os.IsExist(err) {
+		Error.Printf("error creating dir %v\n", err)
+		return freshNode, err
 	}
 
-	logFileName  := fmt.Sprint("%v/%d_raft_log.dat", r.conf.LogPath, r.listenPort)
-	metaFileName := fmt.Sprint("%v/%d_raft_meta.dat", r.conf.LogPath, r.listenPort)
+	logFileName  := fmt.Sprintf("%v/%d_raft_log.dat", r.conf.LogPath, r.listenPort)
+	metaFileName := fmt.Sprintf("%v/%d_raft_meta.dat", r.conf.LogPath, r.listenPort)
 
 	r.logFileDescriptor  = FileData{fileName: logFileName}
 	r.metaFileDescriptor = FileData{fileName: metaFileName}
@@ -111,7 +113,7 @@ func (r *RaftNode) initStableStore() (bool, error) {
 		return freshNode, err
 	} else {
 		freshNode = true
-		fmt.Println("Creating new raft node with meta and log files")
+		Out.Println("Creating new raft node with meta and log files")
 
 		err := CreateRaftLog(&r.logFileDescriptor)
 		if err !=  nil {
@@ -148,7 +150,7 @@ func (r *RaftNode) setCurrentTerm(newTerm uint64) {
 	r.stableState.CurrentTerm = newTerm
 	err := WriteStableState(&r.metaFileDescriptor, r.stableState)
 	if err != nil {
-		Error.Println("Unable to flush new term to disk %v", err)
+		Error.Printf("Unable to flush new term to disk %v \n", err)
 		panic(err)
 	}
 }
@@ -163,7 +165,7 @@ func (r *RaftNode) setVotedFor(candidateId string) {
 	r.stableState.VotedFor = candidateId
 	err := WriteStableState(&r.metaFileDescriptor, r.stableState)
 	if err != nil {
-		Error.Println("unable to flush newly voted for to disk %v", err)
+		Error.Printf("unable to flush newly voted for to disk %v \n", err)
 		panic(err)
 	}
 }
@@ -188,7 +190,7 @@ func (r *RaftNode) GetOtherNodes() []NodeAddr {
 	return r.stableState.OtherNodes
 }
 
-func (r *RaftNode) setOtherNodes(nodes []NodeAddr) {
+func (r *RaftNode) SetOtherNodes(nodes []NodeAddr) {
 	r.ssMutex.Lock()
 	defer r.ssMutex.Unlock()
 	r.stableState.OtherNodes = nodes

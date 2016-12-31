@@ -78,7 +78,8 @@ func AppendLogEntry(fileData *FileData, entry *LogEntry) error {
 	if err != nil {
 		return err
 	}
-	if numOfBytesWritten != len(logBytes) {
+	if uint64(numOfBytesWritten) != INT_GOB_SIZE {
+		fmt.Println(numOfBytesWritten, len(logBytes))
 		panic("did not write correct number of bytes")
 	}
 	fileData.sizeOfFile += uint64(numOfBytesWritten)
@@ -198,7 +199,8 @@ func WriteStableState(fileData *FileData, ss NodeStableState) error {
 		Error.Printf("sync failed %v", err)
 	}
 	err = os.Remove(backupFileName)
-	if err != nil || !os.IsNotExist(err) {
+	if err != nil && !os.IsNotExist(err) {
+		Error.Printf("can not remove backup file %v", err)
 		return errors.New("can not remove backup file")
 	}
 	return nil

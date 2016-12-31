@@ -111,7 +111,7 @@ func CreateNode(localPort uint64, leaderAddr *NodeAddr, conf *Config) (rp *RaftN
 
 	freshNode, err := r.initStableStore()
 	if err != nil {
-		Error.Printf("Error initializing the stable store: %v", err)
+		Error.Printf("Error initializing the stable store: %v \n", err)
 		return nil, err
 	}
 
@@ -128,7 +128,7 @@ func CreateNode(localPort uint64, leaderAddr *NodeAddr, conf *Config) (rp *RaftN
 			err = JoinRPC(leaderAddr, r.GetLocalAddr())
 		} else {
 			Out.Printf("waiting to start node until all have joined\n")
-			r.startNodes()
+			go r.startNodes()
 		}
 	} else {
 		r.State = FOLLOWER_STATE
@@ -150,7 +150,7 @@ func (r *RaftNode) startNodes()  {
 
 	for _, otherNode := range r.GetOtherNodes() {
 		if r.Id != otherNode.Id {
-			Out.Print("%v starting node %v", r.Id, otherNode.Id)
+			Out.Printf("%v starting node %v", r.Id, otherNode.Id)
 			StartNodeRPC(otherNode, r.GetOtherNodes()[:])
 		}
 	}
@@ -167,7 +167,7 @@ func CreateCluster(conf *Config) ([] *RaftNode, error) {
 	nodes := make([] *RaftNode, conf.ClusterSize)
 	nodes[0], err = CreateNode(0, nil, conf)
 	for i := 1; i < conf.ClusterSize; i++ {
-		nodes[i], err = CreateNode(0, nodes[0].LeaderAddress, conf)
+		nodes[i], err = CreateNode(0, nodes[0].GetLocalAddr(), conf)
 		if err != nil {
 			return nil, err
 		}
