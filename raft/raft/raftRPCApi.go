@@ -12,9 +12,9 @@ type StartNodeReply struct {
 // Once the first node in the cluster has addresses of all other nodes, it can tell them to transition to Follower state
 //and start the raft protocol
 func StartNodeRPC(remoteNode NodeAddr, otherNodes []NodeAddr) error {
-	request := StartNodeRequest{RemoteNode: otherNodes}
+	request := StartNodeRequest{RemoteNode: remoteNode}
 	var reply StartNodeReply
-	err := makeRemoteCall(remoteNode, "StartNodeImpl", request, &reply)
+	err := makeRemoteCall(&remoteNode, "StartNodeImpl", request, &reply)
 	if err != nil {
 		return err
 	}
@@ -45,11 +45,11 @@ func JoinRPC(remoteNode *NodeAddr, fromAddr *NodeAddr) error {
 
 
 type RequestVoteRequest struct {
-	FromNode NodeAddr
-	Term uint64
-	CandidateId NodeAddr
-	CandidateLastLogTerm uint64
-	CandidateLastLogIndex uint64
+	Term         uint64
+	CandidateId  NodeAddr
+	LastLogIndex uint64
+	LastLogTerm  uint64
+	CurrentIndex uint64
 }
 
 type RequestVoteReply struct {

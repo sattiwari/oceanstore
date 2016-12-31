@@ -19,7 +19,7 @@ func NewTesting() *TestingPolicy {
 }
 
 func (tp *TestingPolicy) IsDenied(a, b NodeAddr) bool {
-	if tp.PauseWorld {
+	if tp.pauseWorld {
 		return true
 	}
 	commStr := getCommId(a, b)

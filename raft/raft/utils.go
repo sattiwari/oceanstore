@@ -41,7 +41,7 @@ func makeRemoteCall(remoteNode *NodeAddr, method string, req interface{}, resp i
 func getFileStats(filename string) (uint64, bool) {
 	stats, err := os.Stat(filename)
 	if err == nil {
-		return stats.Size(), true
+		return uint64(stats.Size()), true
 	} else if os.IsNotExist(err) {
 		return 0, false
 	} else {
@@ -61,7 +61,7 @@ func (r *RaftNode) hasMajority(N uint64) bool {
 type UInt64Slice []uint64
 
 func (p UInt64Slice) Len() uint64 {
-	return len(p)
+	return uint64(len(p))
 }
 
 func (p UInt64Slice) Swap(i, j uint64) {

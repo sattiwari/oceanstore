@@ -40,7 +40,7 @@ func (server *RaftRPCServer) JoinImpl(request *JoinRequest, reply *JoinReply) er
 }
 
 func (server *RaftRPCServer) RequestVoteImpl(request *RequestVoteRequest, reply *RequestVoteReply) error {
-	if server.node.Testing.IsDenied(request.CandidateId, server.node.GetLocalAddr()) {
+	if server.node.Testing.IsDenied(request.CandidateId, *server.node.GetLocalAddr()) {
 		return ErrorTestingPolicyDenied
 	}
 	rvReply, err := server.node.RequestVote(request)
@@ -49,7 +49,7 @@ func (server *RaftRPCServer) RequestVoteImpl(request *RequestVoteRequest, reply 
 }
 
 func (server *RaftRPCServer) AppendEntriesImpl(request *AppendEntriesRequest, reply *AppendEntriesReply) error {
-	if server.node.Testing.IsDenied(request.LeaderId, server.node.GetLocalAddr()) {
+	if server.node.Testing.IsDenied(request.LeaderId, *server.node.GetLocalAddr()) {
 		return ErrorTestingPolicyDenied
 	}
 	aereply, err := server.node.AppendEntries(request)
@@ -59,12 +59,12 @@ func (server *RaftRPCServer) AppendEntriesImpl(request *AppendEntriesRequest, re
 
 func (server *RaftRPCServer) RegisterClientImpl(request *RegisterClientRequest, reply *RegisterClientReply) error {
 	rcreply, err := server.node.RegisterClient(request)
-	reply = *rcreply
+	*reply = rcreply
 	return err
 }
 
 func (server *RaftRPCServer) ClientRequestImpl(request *ClientRequest, reply *ClientReply) error {
-	rcreply, err := server.node.RegisterClient(request)
-	reply = *rcreply
+	rcreply, err := server.node.ClientRequest(request)
+	*reply = rcreply
 	return err
 }

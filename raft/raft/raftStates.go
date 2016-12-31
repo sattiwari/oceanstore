@@ -285,7 +285,7 @@ func (r *RaftNode) doLeader() state {
 			rep := regClient.reply
 
 			entries := make([]LogEntry, 1)
-			entries[0] = LogEntry{r.getLastLogIndex() + 1, r.GetCurrentTerm(), CLIENT_REGISTRATION, []byte(req.FromNode.Id), ""}
+			entries[0] = LogEntry{r.getLastLogIndex() + 1, r.GetCurrentTerm(), []byte(req.FromNode.Id), CLIENT_REGISTRATION, ""}
 			r.appendLogEntry(entries[0])
 
 			fallback, maj := r.sendAppendEntries(entries)
@@ -322,7 +322,7 @@ func (r *RaftNode) doLeader() state {
 				} else {
 					entries := make([]LogEntry, 1)
 					//Fill in the LogEntry based on the request data
-					entries[0] = LogEntry{r.getLastLogIndex() + 1, r.GetCurrentTerm(), req.Command, req.Data, strconv.FormatUint(req.SequenceNumber, 10)}
+					entries[0] = LogEntry{r.getLastLogIndex() + 1, r.GetCurrentTerm(), req.Data, req.Command, strconv.FormatUint(req.SequenceNumber, 10)}
 					r.appendLogEntry(entries[0])
 
 					r.requestMutex.Lock()
@@ -343,11 +343,12 @@ func (r *RaftNode) sendRequestFail()  {
 
 }
 
-func (r *RaftNode) sendNoop() {
+func (r *RaftNode) sendNoop() bool {
 	entries := make([]LogEntry, 1)
-	entries[0] = LogEntry{r.GetLastLogIndex() + 1, r.GetCurrentTerm(), make([]byte, 0)}
-	fmt.Println("NOOP logged with log index %d and term index %d", r.GetLastLogIndex() + 1, r.GetCurrentTerm())
-	r.appendEntries
+	entries[0] = LogEntry{r.GetLastLogIndex() + 1, r.GetCurrentTerm(), make([]byte, 0), NOOP, ""}
+	r.Out("NOOP logged with log index %d and term index %d", r.GetLastLogIndex() + 1, r.GetCurrentTerm())
+	r.appendLogEntry(entries[0])
+	return false
 }
 
 /*
@@ -363,17 +364,17 @@ func (r *RaftNode) handleCompetingRequestVote(msg RequestVoteMsg) bool {
 	prevIndex := r.commitIndex
 	prevTerm := r.getLogTerm(prevIndex)
 
-	if prevTerm > request.CandidateLastLogTerm {
+	if prevTerm > request.LastLogTerm {
 		reply <- RequestVoteReply{currentTerm, false}
 		return false
-	} else if prevTerm < request.CandidateLastLogTerm {
+	} else if prevTerm < request.LastLogTerm {
 		reply <- RequestVoteReply{currentTerm, true}
 		return true
 	} else {
-		if prevIndex > request.CandidateLastLogIndex {
+		if prevIndex > request.LastLogIndex {
 			reply <- RequestVoteReply{currentTerm, false}
 			return false
-		} else if prevIndex < request.CandidateLastLogIndex {
+		} else if prevIndex < request.LastLogIndex {
 			reply <- RequestVoteReply{currentTerm, true}
 			return true
 		} else {
@@ -395,6 +396,7 @@ func (r *RaftNode) handleCompetingRequestVote(msg RequestVoteMsg) bool {
 		}
 	}
 }
+
 func (r *RaftNode) requestVotes(electionResults chan bool) {
 	go func() {
 		nodes := r.GetOtherNodes()
@@ -404,7 +406,7 @@ func (r *RaftNode) requestVotes(electionResults chan bool) {
 			if node.Id == r.Id {
 				continue
 			}
-			request := RequestVoteMsg{RequestVoteRequest{r.GetCurrentTerm(), r.GetLocalAddr()}}
+			request := RequestVoteRequest{r.GetCurrentTerm(), *r.GetLocalAddr(), r.getLastLogIndex(), r.getLogTerm(r.commitIndex), r.GetLastLogIndex() }
 			reply, _ := r.RequestVoteRPC(&node, request)
 			if reply == nil {
 				continue
@@ -456,10 +458,4 @@ func makeElectionTimeout() <- chan time.Time {
 
 func (r *RaftNode) makeHeartBeats() <- chan time.Time {
 	return time.After(r.conf.HeartbeatFrequency)
-}
-
-func shutdown(off bool) {
-	if (off) {
-		return nil
-	}
 }

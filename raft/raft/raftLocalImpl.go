@@ -1,6 +1,9 @@
 package raft
 
-import "fmt"
+import (
+	"fmt"
+	"errors"
+)
 
 func (r *RaftNode) StartNode(request *StartNodeRequest) error {
 	r.mutex.Lock()
@@ -18,7 +21,7 @@ func (r *RaftNode) Join(request *JoinRequest) error {
 				return nil
 			}
 		}
-		error("all nodes have joined the cluster")
+		errors.New("all nodes have joined the cluster")
 	} else {
 		r.AppendOtherNodes(request.FromNode)
 	}
@@ -35,7 +38,7 @@ func (r *RaftNode) RequestVote(request *RequestVoteRequest) (RequestVoteReply, e
 func (r *RaftNode) AppendEntries(request *AppendEntriesRequest) (AppendEntriesReply, error) {
 	Debug.Printf("AppendEntries request received\n")
 	reply := make(chan AppendEntriesReply)
-	r.requestVote <- AppendEntriesMsg{request:request, reply: reply}
+	r.appendEntries <- AppendEntriesMsg{request:request, reply: reply}
 	return <-reply, nil
 }
 
@@ -49,7 +52,7 @@ func (r *RaftNode) RegisterClient(request *RegisterClientRequest) (RegisterClien
 func (r *RaftNode) ClientRequest(request *ClientRequest) (ClientReply, error) {
 	Debug.Printf("Client request received\n")
 	reply := make(chan ClientReply)
-	r.registerClient <- ClientRequestMsg{request: request, reply: reply}
+	r.clientRequest <- ClientRequestMsg{request: request, reply: reply}
 	return <-reply, nil
 }
 

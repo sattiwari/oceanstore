@@ -66,7 +66,7 @@ type NodeAddr struct {
 	Id      string
 }
 
-func CreateNode(localPort int, leaderAddr *NodeAddr, conf *Config) (rp *RaftNode, err error) {
+func CreateNode(localPort uint64, leaderAddr *NodeAddr, conf *Config) (rp *RaftNode, err error) {
 	var r RaftNode
 	rp = &r
 	var conn net.Listener
@@ -141,7 +141,7 @@ func CreateNode(localPort int, leaderAddr *NodeAddr, conf *Config) (rp *RaftNode
 
 func (r *RaftNode) startNodes()  {
 	r.mutex.Lock()
-	r.AppendOtherNodes(r.GetLocalAddr())
+	r.AppendOtherNodes(*r.GetLocalAddr())
 	r.mutex.Unlock()
 
 	for len(r.GetOtherNodes()) < r.conf.ClusterSize {

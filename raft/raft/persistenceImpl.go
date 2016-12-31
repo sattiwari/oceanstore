@@ -96,7 +96,7 @@ func TruncateLog(logFd *FileData, index uint64) error {
 		return fmt.Errorf("log entry does not exist")
 	}
 	logFd.fileDescriptor.Close()
-	err := os.Truncate(logFd.fileName, fileSize)
+	err := os.Truncate(logFd.fileName, int64(fileSize))
 	if err != nil {
 		return nil
 	}
@@ -280,7 +280,7 @@ func readStructSize(f *os.File) (int, error) {
 	if err != nil {
 		return -1, err
 	}
-	if int64(sizeBytes) != INT_GOB_SIZE {
+	if uint64(sizeBytes) != INT_GOB_SIZE {
 		panic("The raftlog may be corrupt, cannot proceed")
 	}
 
@@ -341,10 +341,10 @@ func fileExists(fileName string) bool {
 	return exists
 }
 
-func getFileInfo(fileName string) (int64, bool) {
-	size, err := os.Stat(fileName)
+func getFileInfo(fileName string) (uint64, bool) {
+	fileInfo, err := os.Stat(fileName)
 	if err == nil {
-		return size, true
+		return uint64(fileInfo.Size()), true
 	} else if os.IsNotExist(err) {
 		return 0, false
 	} else {
