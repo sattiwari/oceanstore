@@ -13,6 +13,11 @@ type StartNodeReply struct {
 //and start the raft protocol
 func StartNodeRPC(remoteNode NodeAddr, otherNodes []NodeAddr) error {
 	request := StartNodeRequest{RemoteNode: remoteNode}
+	request.OtherNodes = make([]NodeAddr, len(otherNodes))
+	for i, n := range otherNodes {
+		request.OtherNodes[i].Address = n.Address
+		request.OtherNodes[i].Id = n.Id
+	}
 	var reply StartNodeReply
 	err := makeRemoteCall(&remoteNode, "StartNodeImpl", request, &reply)
 	if err != nil {
