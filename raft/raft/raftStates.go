@@ -1,7 +1,6 @@
 package raft
 
 import (
-	"fmt"
 	"time"
 	"math"
 	"math/rand"
@@ -412,7 +411,7 @@ func (r *RaftNode) requestVotes(electionResults chan bool) {
 				continue
 			}
 			if r.GetCurrentTerm() < reply.Term {
-				fmt.Println("[Term outdated] Current = %d, Remote = %d", r.GetCurrentTerm(), reply.Term)
+				Out.Printf("[Term outdated] Current = %d, Remote = %d\n", r.GetCurrentTerm(), reply.Term)
 				electionResults <-  false
 				return
 			}
@@ -428,7 +427,16 @@ func (r *RaftNode) requestVotes(electionResults chan bool) {
 }
 
 func (r *RaftNode) sendEmptyHeartBeats()  {
-
+	nodes := r.GetOtherNodes()
+	for _, n := range nodes {
+		if n.Id == r.Id {
+			continue
+		}
+		r.AppendEntriesRPC(&n,
+			AppendEntriesRequest{r.GetCurrentTerm(), *r.GetLocalAddr(),
+				r.getLastLogIndex(), r.getLastLogTerm(), make([]LogEntry, 0),
+				r.commitIndex})
+	}
 }
 
 /**
@@ -442,7 +450,78 @@ func (r *RaftNode) sendEmptyHeartBeats()  {
  * machine should be given the new log entries via processLog.
  */
 func (r *RaftNode) sendHeartBeats(fallback, finish chan bool) {
+	go func() {
+		nodes := r.GetOtherNodes()
+		succ_nodes := 1
+		for _, n := range nodes {
+			if n.Id == r.Id {
+				continue
+			}
+			if r.State != LEADER_STATE {
+				return
+			}
+			prevLogIndex := r.nextIndex[n.Id] - 1
+			if prevLogIndex > r.getLastLogIndex() {
+				r.nextIndex[n.Id] = r.getLastLogIndex() + 1
+				prevLogIndex = r.getLastLogIndex()
+			}
+			prevLogTerm := r.getLogEntry(prevLogIndex).Term
+			reply, _ := r.AppendEntriesRPC(&n,
+				AppendEntriesRequest{r.GetCurrentTerm(), *r.GetLocalAddr(),
+					prevLogIndex, prevLogTerm, make([]LogEntry, 0),
+					r.commitIndex})
 
+			if reply == nil {
+				continue
+			}
+
+			if r.GetCurrentTerm() < reply.Term {
+				r.setCurrentTerm(reply.Term)
+				fallback <- true
+				return
+			}
+
+			if reply.Success {
+				succ_nodes++
+				nextIndex := r.nextIndex[n.Id]
+				r.matchIndex[n.Id] = r.nextIndex[n.Id] - 1
+				if (nextIndex - 1) != r.getLastLogIndex() {
+					entries := r.getLogEntries(nextIndex, r.getLastLogIndex())
+					reply, _ = r.AppendEntriesRPC(&n,
+						AppendEntriesRequest{r.GetCurrentTerm(), *r.GetLocalAddr(),
+							prevLogIndex, prevLogTerm, entries,
+							r.commitIndex})
+
+					if reply != nil && reply.Success {
+						r.nextIndex[n.Id] = r.getLastLogIndex() + 1
+						r.matchIndex[n.Id] = r.nextIndex[n.Id] - 1
+					}
+				}
+
+			} else {
+				r.nextIndex[n.Id]--
+			}
+		}
+
+		for N := r.getLastLogIndex(); N > r.commitIndex; N-- {
+			if r.hasMajority(N) && r.getLogTerm(N) == r.GetCurrentTerm() {
+				r.commitIndex = N
+			}
+		}
+
+		if r.lastApplied != r.commitIndex {
+			i := r.lastApplied
+			if r.lastApplied != 0 {
+				i++
+			}
+			for ; i <= r.commitIndex; i++ {
+				_ = r.processLog(*r.getLogEntry(i))
+			}
+			r.lastApplied = r.commitIndex
+		}
+
+		finish <- true
+	}()
 }
 
 func (r *RaftNode) sendAppendEntries(entries []LogEntry) (fallBack, sentToMajority bool) {
