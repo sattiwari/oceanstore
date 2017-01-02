@@ -1,44 +1,46 @@
 package raft
 
 import (
-	"os"
 	"bytes"
 	"encoding/gob"
 	"errors"
-	"io"
 	"fmt"
+	"io"
+	"os"
 )
 
-// functions to assist interaction with Log entries
+/*                                                                  */
+/* Main functions to assist with interacting with log entries, etc. */
+/*                                                                  */
 
 func openRaftLogForWrite(fileData *FileData) error {
-	if fileExists(fileData.fileName) {
-		fd, err := os.OpenFile(fileData.fileName, os.O_CREATE | os.O_APPEND | os.O_WRONLY, 0600)
-		fileData.fileDescriptor = fd
-		fileData.isFileDescriptorOpen = true
+	if fileExists(fileData.filename) {
+		fd, err := os.OpenFile(fileData.filename, os.O_APPEND|os.O_WRONLY, 0600)
+		fileData.fd = fd
+		fileData.open = true
 		return err
 	} else {
-		return errors.New("file does not exist")
+		return errors.New("Raftfile does not exist")
 	}
 }
 
 func CreateRaftLog(fileData *FileData) error {
-	fd, err := os.OpenFile(fileData.fileName, os.O_CREATE | os.O_APPEND | os.O_WRONLY, 0600)
-	fileData.fileDescriptor = fd
-	fileData.sizeOfFile = uint64(0)
-	fileData.logEntryIdxToFileSizeMap = make(map[uint64]uint64)
-	fileData.isFileDescriptorOpen = true
+	fd, err := os.OpenFile(fileData.filename, os.O_CREATE|os.O_APPEND|os.O_WRONLY, 0600)
+	fileData.fd = fd
+	fileData.size = int64(0)
+	fileData.idxMap = make(map[uint64]int64)
+	fileData.open = true
 	return err
 }
 
 func ReadRaftLog(fileData *FileData) ([]LogEntry, error) {
-	f, err := os.Open(fileData.fileName)
+	f, err := os.Open(fileData.filename)
 	defer f.Close()
-	fileData.logEntryIdxToFileSizeMap = make(map[uint64]uint64)
+	fileData.idxMap = make(map[uint64]int64)
 
 	entries := make([]LogEntry, 0)
 
-	fileLocation := uint64(0)
+	fileLocation := int64(0)
 	for err != io.EOF {
 		size, err := readStructSize(f)
 		if err != nil {
@@ -46,209 +48,272 @@ func ReadRaftLog(fileData *FileData) ([]LogEntry, error) {
 				break
 			}
 			Error.Printf("Error reading struct size: %v at loc: %v\n", err, fileLocation)
-			fileData.isFileDescriptorOpen = false
+			fileData.open = false
 			return entries, err
 		}
 
 		entry, err := readLogEntry(f, size)
 		if err != nil {
 			Error.Printf("Error reading log entry: %v at loc: %v\n", err, fileLocation)
-			fileData.isFileDescriptorOpen = false
+			fileData.open = false
 			return entries, err
 		}
-		fileData.logEntryIdxToFileSizeMap[entry.Index] = fileLocation
-		fileLocation += INT_GOB_SIZE + uint64(size)
+		fileData.idxMap[entry.Index] = fileLocation
+		fileLocation += INT_GOB_SIZE + int64(size)
 		entries = append(entries, *entry)
 	}
 
-	fileData.isFileDescriptorOpen = false
+	fileData.open = false
 	return entries, nil
 }
 
 func AppendLogEntry(fileData *FileData, entry *LogEntry) error {
+	sizeIdx := fileData.size
+
 	logBytes, err := getLogEntryBytes(entry)
 	if err != nil {
 		return err
 	}
-	size , err := getSizeBytes(len(logBytes))
+	size, err := getSizeBytes(len(logBytes))
 	if err != nil {
 		return err
 	}
-	numOfBytesWritten, err := fileData.fileDescriptor.Write(size)
+
+	numBytesWritten, err := fileData.fd.Write(size)
 	if err != nil {
 		return err
 	}
-	if uint64(numOfBytesWritten) != INT_GOB_SIZE {
-		fmt.Println(numOfBytesWritten, len(logBytes))
-		panic("did not write correct number of bytes")
+	if int64(numBytesWritten) != INT_GOB_SIZE {
+		panic("int gob size is not correct, cannot proceed")
 	}
-	fileData.sizeOfFile += uint64(numOfBytesWritten)
-	err = fileData.fileDescriptor.Sync()
+	fileData.size += int64(numBytesWritten)
+
+	err = fileData.fd.Sync()
 	if err != nil {
 		return err
 	}
-	fileData.logEntryIdxToFileSizeMap[entry.Index] = fileData.sizeOfFile
+
+	numBytesWritten, err = fileData.fd.Write(logBytes)
+	if err != nil {
+		return err
+	}
+	if numBytesWritten != len(logBytes) {
+		panic("did not write correct amount of bytes for some reason for log entry")
+	}
+	fileData.size += int64(numBytesWritten)
+
+	err = fileData.fd.Sync()
+	if err != nil {
+		return err
+	}
+
+	// Update index mapping for this entry
+	fileData.idxMap[entry.Index] = int64(sizeIdx)
+
 	return nil
 }
 
-func TruncateLog(logFd *FileData, index uint64) error {
-	fileSize, exist := logFd.logEntryIdxToFileSizeMap[index]
+func TruncateLog(raftLogFd *FileData, index uint64) error {
+	newFileSize, exist := raftLogFd.idxMap[index]
 	if !exist {
-		return fmt.Errorf("log entry does not exist")
+		return fmt.Errorf("Truncation failed, log index %v doesn't exist\n", index)
 	}
-	logFd.fileDescriptor.Close()
-	err := os.Truncate(logFd.fileName, int64(fileSize))
+
+	// Windows does not allow truncation of open file, must close first
+	raftLogFd.fd.Close()
+	err := os.Truncate(raftLogFd.filename, newFileSize)
 	if err != nil {
-		return nil
+		return err
 	}
-	fd, err := os.OpenFile(logFd.fileName, os.O_APPEND | os.O_WRONLY, 0600)
-	logFd.fileDescriptor = fd
-	for i := index; i < uint64(len(logFd.logEntryIdxToFileSizeMap)); i++ {
-		delete(logFd.logEntryIdxToFileSizeMap, i)
+	fd, err := os.OpenFile(raftLogFd.filename, os.O_APPEND|os.O_WRONLY, 0600)
+	raftLogFd.fd = fd
+
+	for i := index; i < uint64(len(raftLogFd.idxMap)); i++ {
+		delete(raftLogFd.idxMap, i)
 	}
-	logFd.sizeOfFile = fileSize
+	raftLogFd.size = newFileSize
 	return nil
 }
 
-// functions to assist interaction with stable state entries
-
+/*                                                                           */
+/* Main functions to assist with interacting with stable state entries, etc. */
+/*                                                                           */
 func openStableStateForWrite(fileData *FileData) error {
-	if fileExists(fileData.fileName) {
-		fd, err := os.OpenFile(fileData.fileName, os.O_APPEND | os.O_WRONLY, 0600)
-		fileData.fileDescriptor = fd
-		fileData.isFileDescriptorOpen = true
+	if fileExists(fileData.filename) {
+		fd, err := os.OpenFile(fileData.filename, os.O_APPEND|os.O_WRONLY, 0600)
+		fileData.fd = fd
+		fileData.open = true
 		return err
 	} else {
-		return errors.New("stable state file does not exist")
+		return errors.New("Stable state file does not exist")
 	}
 }
 
 func CreateStableState(fileData *FileData) error {
-	fd, err := os.OpenFile(fileData.fileName, os.O_CREATE | os.O_APPEND | os.O_WRONLY, 0600)
-	fileData.fileDescriptor = fd
-	fileData.isFileDescriptorOpen = true
+	fd, err := os.OpenFile(fileData.filename, os.O_CREATE|os.O_APPEND|os.O_WRONLY, 0600)
+	fileData.fd = fd
+	fileData.open = true
 	return err
 }
 
-
 func ReadStableState(fileData *FileData) (*NodeStableState, error) {
-	f, err := os.Open(fileData.fileName)
-	if err != nil {
-		return nil, err
-	}
+	f, err := os.Open(fileData.filename)
+
 	stat, err := f.Stat()
 	if err != nil {
 		f.Close()
 		return nil, err
 	}
+
 	ss, err := readStableStateEntry(f, int(stat.Size()))
 	f.Close()
+
 	if err != nil {
-		Debug.Println("Try debug file when we fail to read from stable state file")
-		backupFileName := fmt.Sprintf("%v.bak", fileData.fileName)
-		fbak, err := os.Open(backupFileName)
-		stat, err = fbak.Stat()
+		// for some reason we failed to read our stable state file, try backup file.
+		backupFilename := fmt.Sprintf("%v.bak", fileData.filename)
+		fbak, err := os.Open(backupFilename)
+
+		stat, err := f.Stat()
 		if err != nil {
 			fbak.Close()
 			return nil, err
 		}
-		ss, err = readStableStateEntry(f, int(stat.Size()))
+
+		ss, err := readStableStateEntry(f, int(stat.Size()))
 		if err != nil {
-			Error.Println("failed to read from stable state and backup file")
+			Error.Printf("we were unable to read stable storage or its backup: %v\n", err)
 			fbak.Close()
 			return nil, err
 		}
 		fbak.Close()
-		Debug.Println("read successfully from backup file; move to live copy")
-		err = os.Remove(fileData.fileName)
+
+		// we were successful reading from backup, move to live copy
+		err = os.Remove(fileData.filename)
 		if err != nil {
 			return nil, err
 		}
-		err = copyFile(backupFileName, fileData.fileName)
+		err = copyFile(backupFilename, fileData.filename)
 		if err != nil {
 			return nil, err
 		}
+
+		return ss, nil
 	}
+
 	return ss, nil
 }
 
 func WriteStableState(fileData *FileData, ss NodeStableState) error {
-//	backup old stable state
-	backupFileName := fmt.Sprintf("%v.bak", fileData.fileName)
-	err := backupStableState(fileData, backupFileName)
+	// backup old stable state
+	backupFilename := fmt.Sprintf("%v.bak", fileData.filename)
+	err := backupStableState(fileData, backupFilename)
 	if err != nil {
-		return errors.New("backup failed")
+		return fmt.Errorf("Backup failed: %v", err)
 	}
-	fileData.fileDescriptor.Close()
-	err = os.Truncate(fileData.fileName, 0)
+
+	// Windows does not allow truncation of open file, must close first
+	fileData.fd.Close()
+
+	// truncate live stable state
+	err = os.Truncate(fileData.filename, 0)
 	if err != nil {
-		return err
+		return fmt.Errorf("Truncation failed: %v", err)
 	}
-	fd, err := os.OpenFile(fileData.fileName, os.O_APPEND | os.O_WRONLY, 0600)
-	fileData.fileDescriptor = fd
+	fd, err := os.OpenFile(fileData.filename, os.O_APPEND|os.O_WRONLY, 0600)
+	fileData.fd = fd
+
+	// write out stable state to live version
 	bytes, err := getStableStateBytes(ss)
 	if err != nil {
 		return err
 	}
-	numBytes, err := fileData.fileDescriptor.Write(bytes)
+
+	numBytes, err := fileData.fd.Write(bytes)
 	if numBytes != len(bytes) {
-		panic("did not write correct number of bytes on stable state")
+		panic("did not write correct amount of bytes for some reason for ss")
 	}
-	err = fileData.fileDescriptor.Sync()
+
+	err = fileData.fd.Sync()
 	if err != nil {
-		Error.Printf("sync failed %v", err)
+		return fmt.Errorf("Sync #2 failed: %v", err)
 	}
-	err = os.Remove(backupFileName)
+
+	// remove backup file
+	err = os.Remove(backupFilename)
 	if err != nil && !os.IsNotExist(err) {
-		Error.Printf("can not remove backup file %v", err)
-		return errors.New("can not remove backup file")
+		return fmt.Errorf("Remove failed: %v", err)
 	}
+
 	return nil
 }
 
-func backupStableState(fileData *FileData, backupFileName string) error {
-	if fileData.isFileDescriptorOpen && fileData.fileDescriptor != nil {
-		err := fileData.fileDescriptor.Close()
-		fileData.isFileDescriptorOpen = false
+func backupStableState(fileData *FileData, backupFilename string) error {
+	if fileData.open && fileData.fd != nil {
+		err := fileData.fd.Close()
+		fileData.open = false
 		if err != nil {
-			return err
+			return fmt.Errorf("Closing file failed: %v", err)
 		}
 	}
-	err := os.Remove(backupFileName)
-	err = copyFile(fileData.fileName, backupFileName)
+
+	err := os.Remove(backupFilename)
+	if err != nil && !os.IsNotExist(err) {
+		return fmt.Errorf("Remove failed: %v", err)
+	}
+
+	err = copyFile(fileData.filename, backupFilename)
+	if err != nil {
+		return fmt.Errorf("File copy failed: %v", err)
+	}
+
 	err = openStableStateForWrite(fileData)
 	if err != nil {
-		return err
+		return fmt.Errorf("Opening stable state for writing failed: %v", err)
 	}
+
 	return nil
 }
 
-func copyFile(srcFileName string, desFileName string) error {
-	src, err := os.Open(srcFileName)
-	des, err := os.Create(desFileName)
-	if err != nil {
-		return errors.New("error opening source or destination file")
-	}
-	_, err = io.Copy(des, src)
+func copyFile(srcFile string, dstFile string) error {
+	src, err := os.Open(srcFile)
 	if err != nil {
 		return err
 	}
+
+	dst, err := os.Create(dstFile)
+	if err != nil {
+		return err
+	}
+
+	_, err = io.Copy(dst, src)
+	if err != nil {
+		return err
+	}
+
 	err = src.Close()
-	err = des.Close()
 	if err != nil {
-		return errors.New("error closing source or destination file")
+		fmt.Errorf("Error closing src file")
+		return err
+	}
+
+	err = dst.Close()
+	if err != nil {
+		fmt.Errorf("Error closing dst file")
+		return err
 	}
 	return nil
 }
 
-// helper functions to assist read / write log entries
+/*                                                                */
+/* Helper functions to assist with read/writing log entries, etc. */
+/*                                                                */
 
-const INT_GOB_SIZE uint64 = 5
+const INT_GOB_SIZE int64 = 5
 
 func getStableStateBytes(ss NodeStableState) ([]byte, error) {
 	b := new(bytes.Buffer)
 	e := gob.NewEncoder(b)
-	err  := e.Encode(ss)
+	err := e.Encode(ss)
 	if err != nil {
 		return nil, err
 	}
@@ -258,7 +323,7 @@ func getStableStateBytes(ss NodeStableState) ([]byte, error) {
 func getSizeBytes(size int) ([]byte, error) {
 	b := new(bytes.Buffer)
 	e := gob.NewEncoder(b)
-	err  := e.Encode(size)
+	err := e.Encode(size)
 	if err != nil {
 		return nil, err
 	}
@@ -268,7 +333,7 @@ func getSizeBytes(size int) ([]byte, error) {
 func getLogEntryBytes(entry *LogEntry) ([]byte, error) {
 	b := new(bytes.Buffer)
 	e := gob.NewEncoder(b)
-	err  := e.Encode(*entry)
+	err := e.Encode(*entry)
 	if err != nil {
 		return nil, err
 	}
@@ -282,7 +347,7 @@ func readStructSize(f *os.File) (int, error) {
 	if err != nil {
 		return -1, err
 	}
-	if uint64(sizeBytes) != INT_GOB_SIZE {
+	if int64(sizeBytes) != INT_GOB_SIZE {
 		panic("The raftlog may be corrupt, cannot proceed")
 	}
 
@@ -326,8 +391,9 @@ func readStableStateEntry(f *os.File, size int) (*NodeStableState, error) {
 		return nil, err
 	}
 	if leSize != size {
-		panic("The raftlog may be corrupt, cannot proceed")
+		panic("The stable state log may be corrupt, cannot proceed")
 	}
+
 	buff := bytes.NewBuffer(b)
 	var ss NodeStableState
 	dataDecoder := gob.NewDecoder(buff)
@@ -335,18 +401,25 @@ func readStableStateEntry(f *os.File, size int) (*NodeStableState, error) {
 	if err != nil {
 		return nil, err
 	}
+
 	return &ss, nil
 }
 
-func fileExists(fileName string) bool {
-	_, exists := getFileInfo(fileName)
-	return exists
+func fileExists(filename string) bool {
+	_, err := os.Stat(filename)
+	if err == nil {
+		return true
+	} else if os.IsNotExist(err) {
+		return false
+	} else {
+		panic(err)
+	}
 }
 
-func getFileInfo(fileName string) (uint64, bool) {
-	fileInfo, err := os.Stat(fileName)
+func getFileInfo(filename string) (int64, bool) {
+	stat, err := os.Stat(filename)
 	if err == nil {
-		return uint64(fileInfo.Size()), true
+		return stat.Size(), true
 	} else if os.IsNotExist(err) {
 		return 0, false
 	} else {

@@ -1,6 +1,7 @@
 package raft
 
 import (
+	"fmt"
 	"net/rpc"
 )
 
@@ -8,16 +9,16 @@ type RaftRPCServer struct {
 	node *RaftNode
 }
 
-func (server *RaftRPCServer) startRPCServer() {
+func (server *RaftRPCServer) startRpcServer() {
 	for {
 		if server.node.IsShutDown {
-			Out.Printf("%v shutting down RPC server \n", server.node.Id)
+			fmt.Printf("(%v) Shutting down RPC server\n", server.node.Id)
 			return
 		}
 		conn, err := server.node.Listener.Accept()
 		if err != nil {
 			if !server.node.IsShutDown {
-				Out.Printf("%v Raft RPC accept error %v\n", server.node.Id, err)
+				fmt.Printf("(%v) Raft RPC server accept error: %v\n", server.node.Id, err)
 			}
 			continue
 		}
@@ -29,45 +30,44 @@ func (server *RaftRPCServer) startRPCServer() {
 	}
 }
 
-func (server *RaftRPCServer) StartNodeImpl(request *StartNodeRequest, reply *StartNodeReply) error {
-	err := server.node.StartNode(request)
+func (server *RaftRPCServer) JoinImpl(req *JoinRequest, reply *JoinReply) error {
+	err := server.node.Join(req)
 	reply.Success = err == nil
 	return err
 }
 
-func (server *RaftRPCServer) JoinImpl(request *JoinRequest, reply *JoinReply) error {
-	err := server.node.Join(request)
+func (server *RaftRPCServer) StartNodeImpl(req *StartNodeRequest, reply *StartNodeReply) error {
+	err := server.node.StartNode(req)
 	reply.Success = err == nil
 	return err
 }
 
-func (server *RaftRPCServer) RequestVoteImpl(request *RequestVoteRequest, reply *RequestVoteReply) error {
-	if server.node.Testing.IsDenied(request.CandidateId, *server.node.GetLocalAddr()) {
+func (server *RaftRPCServer) RequestVoteImpl(req *RequestVoteRequest, reply *RequestVoteReply) error {
+	if server.node.Testing.IsDenied(req.CandidateId, *server.node.GetLocalAddr()) {
 		return ErrorTestingPolicyDenied
 	}
-	server.node.Out("zzz")
-	rvReply, err := server.node.RequestVote(request)
-	*reply = rvReply
+	rvreply, err := server.node.RequestVote(req)
+	*reply = rvreply
 	return err
 }
 
-func (server *RaftRPCServer) AppendEntriesImpl(request *AppendEntriesRequest, reply *AppendEntriesReply) error {
-	if server.node.Testing.IsDenied(request.LeaderId, *server.node.GetLocalAddr()) {
+func (server *RaftRPCServer) ClientRequestImpl(req *ClientRequest, reply *ClientReply) error {
+	rvreply, err := server.node.ClientRequest(req)
+	*reply = rvreply
+	return err
+}
+
+func (server *RaftRPCServer) RegisterClientImpl(req *RegisterClientRequest, reply *RegisterClientReply) error {
+	rvreply, err := server.node.RegisterClient(req)
+	*reply = rvreply
+	return err
+}
+
+func (server *RaftRPCServer) AppendEntriesImpl(req *AppendEntriesRequest, reply *AppendEntriesReply) error {
+	if server.node.Testing.IsDenied(req.LeaderId, *server.node.GetLocalAddr()) {
 		return ErrorTestingPolicyDenied
 	}
-	aereply, err := server.node.AppendEntries(request)
+	aereply, err := server.node.AppendEntries(req)
 	*reply = aereply
-	return err
-}
-
-func (server *RaftRPCServer) RegisterClientImpl(request *RegisterClientRequest, reply *RegisterClientReply) error {
-	rcreply, err := server.node.RegisterClient(request)
-	*reply = rcreply
-	return err
-}
-
-func (server *RaftRPCServer) ClientRequestImpl(request *ClientRequest, reply *ClientReply) error {
-	rcreply, err := server.node.ClientRequest(request)
-	*reply = rcreply
 	return err
 }

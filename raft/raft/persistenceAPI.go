@@ -1,75 +1,72 @@
 package raft
 
 import (
-	"os"
-	"fmt"
 	"errors"
+	"fmt"
+	"os"
 )
 
-/*
-Raft divides time into terms of arbitrary length. Terms act as a logical clock in Raft, they allow servers to detect obsolete information such as stale leaders.
- */
-
 type NodeStableState struct {
-	//latest term the server has been assigned, starts with 0 on boot and then increases
+	/* Latest term the server has seen (initialized */
+	/* to 0 on first boot, increases monotonically) */
 	CurrentTerm uint64
 
-	//the candidate id that recieved our vote in the current term. "" if none
+	/* The candidate Id that received our vote in   */
+	/* the current term (or "" if none).            */
 	VotedFor string
 
-	//local listening address and id
+	/* Our local listening address and Id           */
 	LocalAddr NodeAddr
 
-	//addresses of everyone in the cluster
+	/* The addresses of everyone in our cluster     */
 	OtherNodes []NodeAddr
 
-	//client request cache, maps a client request to the response that was sent to them
+	/* Client request cache, maps a client request  */
+	/* to the response that was sent to them.       */
 	ClientRequestSequences map[string]ClientReply
 }
 
 type LogEntry struct {
+	/* Index of log entry (first index = 1)         */
 	Index uint64
-	Term uint64
-	Data []byte
+
+	/* The term that this entry was in when added   */
+	TermId uint64
+
+	/* Command associated with this log entry in    */
+	/* the user's finite-state-machine.             */
 	Command FsmCommand
 
-	//this Id is used when caching the response after processing the command. Empty string means no caching.
+	/* Data associated with this log entry in the   */
+	/* user's finite-state-machine.                 */
+	Data []byte
+
+	/* After processing this log entry, what ID to  */
+	/* use when caching the response. Use an empty  */
+	/* string to not cache at all                   */
 	CacheId string
 }
 
 type FileData struct {
-	fileDescriptor *os.File
-	sizeOfFile uint64
-	fileName string
-	logEntryIdxToFileSizeMap map[uint64]uint64
-	isFileDescriptorOpen bool
-}
+	/* Active file descriptor of to file */
+	fd *os.File
 
-func (r *RaftNode) GetLastLogIndex() uint64 {
-	return uint64(len(r.logCache) - 1)
-}
+	/* Size of file after reading it in and after writes */
+	size int64
 
+	/* Filename of file */
+	filename string
 
-func (r *RaftNode) AppendOtherNodes(other NodeAddr) {
-	r.ssMutex.Lock()
-	defer r.ssMutex.Unlock()
-	r.stableState.OtherNodes = append(r.stableState.OtherNodes, other)
-	err := WriteStableState(&r.metaFileDescriptor, r.stableState)
-	if err != nil {
-		Error.Printf("Unable to flush new nodes to disk")
-		panic(err)
-	}
-}
+	/* Map from LogEntry index to size of file before that index starts */
+	idxMap map[uint64]int64
 
-func CreateMetaLog(FileData *FileData) error {
-	fd, err := os.OpenFile(FileData.fileName, os.O_CREATE | os.O_APPEND | os.O_WRONLY, 0600)
-	FileData.fileDescriptor = fd
-	FileData.isFileDescriptorOpen = true
-	return err
+	/* Is the fd open or not? */
+	open bool
 }
 
 func (r *RaftNode) initStableStore() (bool, error) {
 	freshNode := false
+	// Create log path directory if it doesn't already exist
 	err := os.Mkdir(r.conf.LogPath, 0777)
 	if err == nil {
 		Out.Printf("Created log directory: %v\n", r.conf.LogPath)
@@ -79,84 +76,109 @@ func (r *RaftNode) initStableStore() (bool, error) {
 		return freshNode, err
 	}
 
-	logFileName  := fmt.Sprintf("%v/%d_raft_log.dat", r.conf.LogPath, r.listenPort)
-	metaFileName := fmt.Sprintf("%v/%d_raft_meta.dat", r.conf.LogPath, r.listenPort)
+	r.logFileDescriptor = FileData{
+		fd:       nil,
+		size:     0,
+		filename: fmt.Sprintf("%v/%d_raftlog.dat", r.conf.LogPath, r.listenPort),
+	}
+	r.metaFileDescriptor = FileData{
+		fd:       nil,
+		size:     0,
+		filename: fmt.Sprintf("%v/%d_raftmeta.dat", r.conf.LogPath, r.listenPort),
+	}
+	raftLogSize, raftLogExists := getFileInfo(r.logFileDescriptor.filename)
+	r.logFileDescriptor.size = raftLogSize
 
-	r.logFileDescriptor  = FileData{fileName: logFileName}
-	r.metaFileDescriptor = FileData{fileName: metaFileName}
+	raftMetaSize, raftMetaExists := getFileInfo(r.metaFileDescriptor.filename)
+	r.metaFileDescriptor.size = raftMetaSize
 
-	logSize, raftLogExists  := getFileStats(r.logFileDescriptor.fileName)
-	r.logFileDescriptor.sizeOfFile = logSize
-
-	metaSize, raftMetaExists := getFileStats(r.metaFileDescriptor.fileName)
-	r.metaFileDescriptor.sizeOfFile = metaSize
-
+	// Previous state exists, re-populate everything
 	if raftLogExists && raftMetaExists {
-		Out.Println("Previous stable state exists, repopulate everything")
+		fmt.Printf("Reloading previous raftlog (%v) and raftmeta (%v)\n",
+			r.logFileDescriptor.filename, r.metaFileDescriptor.filename)
+		// Read in previous log and populate index mappings
 		entries, err := ReadRaftLog(&r.logFileDescriptor)
 		if err != nil {
+			Error.Printf("Error reading in raft log: %v\n", err)
 			return freshNode, err
 		}
 		r.logCache = entries
+
+		// Create append-only file descriptor for later writing out of log entries.
 		err = openRaftLogForWrite(&r.logFileDescriptor)
 		if err != nil {
+			Error.Printf("Error opening raftlog for write: %v\n", err)
 			return freshNode, err
 		}
+
+		// Read in previous metalog and set cache
 		ss, err := ReadStableState(&r.metaFileDescriptor)
 		if err != nil {
+			Error.Printf("Error reading stable state: %v\n", err)
 			return freshNode, err
 		}
 		r.stableState = *ss
-	} else if (!raftLogExists && raftMetaExists) || (raftLogExists && !raftMetaExists) {
-		Error.Println("Both log and meta files should exist together")
-		//return errors.New("Both log and meta files should exist together")
-		return freshNode, err
-	} else {
-		freshNode = true
-		Out.Println("Creating new raft node with meta and log files")
 
+	} else if (!raftLogExists && raftMetaExists) || (raftLogExists && !raftMetaExists) {
+		Error.Println("Both raftlog and raftmeta files must exist to proceed!")
+		err = errors.New("Both raftlog and raftmeta files must exist to start this node")
+		return freshNode, err
+
+	} else {
+		// We now assume neither file exists, so let's create new ones
+		freshNode = true
+		Out.Printf("Creating new raftlog and raftmeta files")
 		err := CreateRaftLog(&r.logFileDescriptor)
-		if err !=  nil {
+		if err != nil {
+			Error.Printf("Error creating new raftlog: %v\n", err)
 			return freshNode, err
 		}
-
 		err = CreateStableState(&r.metaFileDescriptor)
 		if err != nil {
+			Error.Printf("Error creating new stable state: %v\n", err)
 			return freshNode, err
 		}
 
+		// Init other nodes to zero, this will become populated
 		r.stableState.OtherNodes = make([]NodeAddr, 0)
+
+		// Init client request cache
 		r.stableState.ClientRequestSequences = make(map[string]ClientReply)
+
+		// No previous log cache exists, so a fresh one must be created.
 		r.logCache = make([]LogEntry, 0)
 
-		initEntry := LogEntry{Index: 0, Term: 0, Command: INIT, Data: []byte{0}}
+		// If the log is empty we need to bootstrap it by adding the first committed entry.
+		initEntry := LogEntry{
+			Index:   0,
+			TermId:  r.GetCurrentTerm(),
+			Command: INIT,
+			Data:    []byte{0},
+		}
 		r.appendLogEntry(initEntry)
 		r.setCurrentTerm(0)
 	}
+
 	return freshNode, nil
 }
 
-func (r *RaftNode) GetCurrentTerm() uint64 {
-	return r.stableState.CurrentTerm
-}
-
+/* Raft metadata setters/getters */
 func (r *RaftNode) setCurrentTerm(newTerm uint64) {
 	r.ssMutex.Lock()
 	defer r.ssMutex.Unlock()
-
-	if r.stableState.CurrentTerm != newTerm {
-		Out.Println("Changing current term from %v to %v", r.stableState.CurrentTerm, newTerm)
+	if newTerm != r.stableState.CurrentTerm {
+		Out.Printf("(%v) Setting current term from %v -> %v", r.Id, r.stableState.CurrentTerm, newTerm)
 	}
 	r.stableState.CurrentTerm = newTerm
 	err := WriteStableState(&r.metaFileDescriptor, r.stableState)
 	if err != nil {
-		Error.Printf("Unable to flush new term to disk %v \n", err)
+		Error.Printf("Unable to flush new term to disk: %v\n", err)
 		panic(err)
 	}
 }
 
-func (r *RaftNode) GetVotedFor() string {
-	return r.stableState.VotedFor
+func (r *RaftNode) GetCurrentTerm() uint64 {
+	return r.stableState.CurrentTerm
 }
 
 func (r *RaftNode) setVotedFor(candidateId string) {
@@ -165,25 +187,28 @@ func (r *RaftNode) setVotedFor(candidateId string) {
 	r.stableState.VotedFor = candidateId
 	err := WriteStableState(&r.metaFileDescriptor, r.stableState)
 	if err != nil {
-		Error.Printf("unable to flush newly voted for to disk %v \n", err)
+		Error.Printf("Unable to flush new votedFor to disk: %v\n", err)
 		panic(err)
 	}
 }
 
+func (r *RaftNode) GetVotedFor() string {
+	return r.stableState.VotedFor
+}
+
+func (r *RaftNode) setLocalAddr(localAddr *NodeAddr) {
+	r.ssMutex.Lock()
+	defer r.ssMutex.Unlock()
+	r.stableState.LocalAddr = *localAddr
+	err := WriteStableState(&r.metaFileDescriptor, r.stableState)
+	if err != nil {
+		Error.Printf("Unable to flush new localaddr to disk: %v\n", err)
+		panic(err)
+	}
+}
 
 func (r *RaftNode) GetLocalAddr() *NodeAddr {
 	return &r.stableState.LocalAddr
-}
-
-func (r *RaftNode) setLocalAddr(addr *NodeAddr) {
-	r.ssMutex.Lock()
-	defer r.ssMutex.Unlock()
-	r.stableState.LocalAddr = *addr
-	err := WriteStableState(&r.metaFileDescriptor, r.stableState)
-	if err != nil {
-		Error.Printf("Unable to flush new local address to disk: %v\n", err)
-		panic(err)
-	}
 }
 
 func (r *RaftNode) GetOtherNodes() []NodeAddr {
@@ -196,14 +221,24 @@ func (r *RaftNode) SetOtherNodes(nodes []NodeAddr) {
 	r.stableState.OtherNodes = nodes
 	err := WriteStableState(&r.metaFileDescriptor, r.stableState)
 	if err != nil {
-		Error.Printf("unable to flush new other nodes to disk: %v", err)
+		Error.Printf("Unable to flush new other nodes to disk: %v\n", err)
 		panic(err)
 	}
 }
 
+func (r *RaftNode) AppendOtherNodes(other NodeAddr) {
+	r.ssMutex.Lock()
+	defer r.ssMutex.Unlock()
+	r.stableState.OtherNodes = append(r.stableState.OtherNodes, other)
+	err := WriteStableState(&r.metaFileDescriptor, r.stableState)
+	if err != nil {
+		Error.Printf("Unable to flush new other nodes to disk: %v\n", err)
+		panic(err)
+	}
+}
 
-func (r *RaftNode) CheckClientRequestCache(clientReq ClientRequest) (*ClientReply, bool) {
-	uniqueId := fmt.Sprintf("%v-%v", clientReq.ClientId, clientReq.SequenceNumber)
+func (r *RaftNode) CheckRequestCache(clientReq ClientRequest) (*ClientReply, bool) {
+	uniqueId := fmt.Sprintf("%v-%v", clientReq.ClientId, clientReq.SequenceNum)
 	val, ok := r.stableState.ClientRequestSequences[uniqueId]
 	if ok {
 		return &val, ok
@@ -212,23 +247,25 @@ func (r *RaftNode) CheckClientRequestCache(clientReq ClientRequest) (*ClientRepl
 	}
 }
 
-func (r *RaftNode) AddRequest(uniqueID string, rep ClientReply) error {
+func (r *RaftNode) AddRequest(uniqueId string, reply ClientReply) error {
 	r.ssMutex.Lock()
 	defer r.ssMutex.Unlock()
-
-	_, ok := r.stableState.ClientRequestSequences[uniqueID]
+	_, ok := r.stableState.ClientRequestSequences[uniqueId]
 	if ok {
-		return errors.New("Request with same client and sequence number exists")
+		return errors.New("Request with the same clientId and seqNum already exists!")
 	}
-	r.stableState.ClientRequestSequences[uniqueID] = rep
+	r.stableState.ClientRequestSequences[uniqueId] = reply
+
 	err := WriteStableState(&r.metaFileDescriptor, r.stableState)
 	if err != nil {
-		Error.Println("Unable to flush new client request to disk %v", err)
+		Error.Printf("Unable to flush new client request to disk: %v\n", err)
 		panic(err)
 	}
+
 	return nil
 }
 
+/* Raft log setters/getters */
 func (r *RaftNode) getLogEntry(index uint64) *LogEntry {
 	if index < uint64(len(r.logCache)) {
 		return &r.logCache[index]
@@ -241,7 +278,7 @@ func (r *RaftNode) getLastLogEntry() *LogEntry {
 	return r.getLogEntry(r.getLastLogIndex())
 }
 
-func (r *RaftNode) getLogEntries(start uint64, end uint64) []LogEntry {
+func (r *RaftNode) getLogEntries(start, end uint64) []LogEntry {
 	if start < uint64(len(r.logCache)) {
 		if end > uint64(len(r.logCache)) {
 			end = uint64(len(r.logCache))
@@ -255,50 +292,62 @@ func (r *RaftNode) getLogEntries(start uint64, end uint64) []LogEntry {
 }
 
 func (r *RaftNode) getLastLogIndex() uint64 {
-	return uint64(len(r.logCache)) - 1
+	return uint64(len(r.logCache) - 1)
 }
 
 func (r *RaftNode) getLastLogTerm() uint64 {
-	return r.getLastLogEntry().Term
+	return r.getLogEntry(r.getLastLogIndex()).TermId
 }
 
-func (r *RaftNode) getLogTerm(index uint64) uint64  {
-	return r.getLogEntry(index).Term
+func (r *RaftNode) getLogTerm(index uint64) uint64 {
+	return r.getLogEntry(index).TermId
 }
 
 func (r *RaftNode) appendLogEntry(entry LogEntry) error {
+	// write entry to disk
 	err := AppendLogEntry(&r.logFileDescriptor, &entry)
 	if err != nil {
 		return err
 	}
+	// update entry in cache
 	r.logCache = append(r.logCache, entry)
 	return nil
 }
 
-// truncate file to remove everything at index and after it
+// Truncate file to remove everything at index and after it (an inclusive truncation!)
 func (r *RaftNode) truncateLog(index uint64) error {
 	err := TruncateLog(&r.logFileDescriptor, index)
 	if err != nil {
 		return err
 	}
+
+	// Truncate cache as well
 	r.logCache = r.logCache[:index]
 	return nil
 }
 
+func CreateFileData(filename string) FileData {
+	fileData := FileData{}
+	fileData.filename = filename
+	return fileData
+}
+
 func (r *RaftNode) RemoveLogs() error {
-	r.logFileDescriptor.fileDescriptor.Close()
-	r.logFileDescriptor.isFileDescriptorOpen = false
-	err := os.Remove(r.logFileDescriptor.fileName)
+	r.logFileDescriptor.fd.Close()
+	r.logFileDescriptor.open = false
+	err := os.Remove(r.logFileDescriptor.filename)
 	if err != nil {
-		Error.Println("unable to remove raft log file")
+		r.Error("Unable to remove raftlog file")
 		return err
 	}
-	r.metaFileDescriptor.fileDescriptor.Close()
-	r.metaFileDescriptor.isFileDescriptorOpen = false
-	err = os.Remove(r.metaFileDescriptor.fileName)
+
+	r.metaFileDescriptor.fd.Close()
+	r.metaFileDescriptor.open = false
+	err = os.Remove(r.metaFileDescriptor.filename)
 	if err != nil {
-		Error.Println("unable to remove meta file")
+		r.Error("Unable to remove raftmeta file")
 		return err
 	}
+
 	return nil
 }

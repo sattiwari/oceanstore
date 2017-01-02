@@ -1,15 +1,21 @@
 package raft
 
 import (
+	"../../tapestry/tapestry"
+	"crypto/sha1"
+	"math/big"
 	"net"
-	"sync"
 	"net/rpc"
+	"os"
+	"sync"
 	"time"
 )
 
-//import "fmt"
-
+/* Node's can be in three possible states */
 type NodeState int
+
+// Tapestry's id
+type ID tapestry.ID
 
 const (
 	FOLLOWER_STATE NodeState = iota
@@ -21,7 +27,7 @@ const (
 type RaftNode struct {
 	Id                 string
 	Listener           net.Listener
-	listenPort         uint64
+	listenPort         int
 
 	//At any given time each server is in one of three states: leader, follower, or candidate.
 	State              NodeState
@@ -59,14 +65,19 @@ type RaftNode struct {
 	hash []byte
 	requestMutex sync.Mutex
 	requestMap map[uint64]ClientRequestMsg
+
+	fileMap    map[string]string
+	fileMapMtx sync.Mutex
+	lockMap    map[string]bool
+	lockMapMtx sync.Mutex
 }
 
 type NodeAddr struct {
-	Address string
-	Id      string
+	Id   string
+	Addr string
 }
 
-func CreateNode(localPort uint64, leaderAddr *NodeAddr, conf *Config) (rp *RaftNode, err error) {
+func CreateNode(localPort int, leaderAddr *NodeAddr, conf *Config) (rp *RaftNode, err error) {
 	var r RaftNode
 	rp = &r
 	var conn net.Listener
@@ -89,6 +100,8 @@ func CreateNode(localPort uint64, leaderAddr *NodeAddr, conf *Config) (rp *RaftN
 	r.nextIndex = make(map[string]uint64)
 	r.matchIndex = make(map[string]uint64)
 
+	r.fileMap = make(map[string]string)
+	r.lockMap = make(map[string]bool)
 	r.Testing = NewTesting()
 	r.Testing.PauseWorld(false)
 
@@ -99,7 +112,7 @@ func CreateNode(localPort uint64, leaderAddr *NodeAddr, conf *Config) (rp *RaftN
 	}
 
 	if err != nil {
-		return
+		return nil, err
 	}
 
 	// create node id based on listener address
@@ -115,19 +128,19 @@ func CreateNode(localPort uint64, leaderAddr *NodeAddr, conf *Config) (rp *RaftN
 		return nil, err
 	}
 
-	r.setLocalAddr(&NodeAddr{Id: r.Id, Address: conn.Addr().String()})
+	r.setLocalAddr(&NodeAddr{Id: r.Id, Addr: conn.Addr().String()})
 
-	//start rpc server
-	r.RPCServer = & RaftRPCServer{rp}
-	rpc.RegisterName(r.GetLocalAddr().Address, r.RPCServer)
-	go r.RPCServer.startRPCServer()
+	// Start RPC server
+	r.RPCServer = &RaftRPCServer{rp}
+	rpc.RegisterName(r.GetLocalAddr().Addr, r.RPCServer)
+	go r.RPCServer.startRpcServer()
 
 	if freshNode {
 		r.State = JOIN_STATE
 		if leaderAddr != nil {
 			err = JoinRPC(leaderAddr, r.GetLocalAddr())
 		} else {
-			Out.Printf("waiting to start node until all have joined\n")
+			Out.Printf("Waiting to start nodes until all have joined\n")
 			go r.startNodes()
 		}
 	} else {
@@ -136,10 +149,9 @@ func CreateNode(localPort uint64, leaderAddr *NodeAddr, conf *Config) (rp *RaftN
 	}
 
 	return
-
 }
 
-func (r *RaftNode) startNodes()  {
+func (r *RaftNode) startNodes() {
 	r.mutex.Lock()
 	r.AppendOtherNodes(*r.GetLocalAddr())
 	r.mutex.Unlock()
@@ -150,24 +162,29 @@ func (r *RaftNode) startNodes()  {
 
 	for _, otherNode := range r.GetOtherNodes() {
 		if r.Id != otherNode.Id {
-			Out.Printf("%v starting node %v", r.Id, otherNode.Id)
-			StartNodeRPC(otherNode, r.GetOtherNodes()[:])
+			Out.Printf("(%v) Starting node-%v\n", r.Id, otherNode.Id)
+			StartNodeRPC(otherNode, r.GetOtherNodes())
 		}
 	}
+
+	// Start the Raft finite-state-machine, initially in follower state
+	go r.run()
 }
 
-func CreateCluster(conf *Config) ([] *RaftNode, error) {
-	if conf == nil {
-		conf = DefaultConfig()
+func CreateLocalCluster(config *Config) ([]*RaftNode, error) {
+	if config == nil {
+		config = DefaultConfig()
 	}
-	err := CheckConfig(conf)
+	err := CheckConfig(config)
 	if err != nil {
 		return nil, err
 	}
-	nodes := make([] *RaftNode, conf.ClusterSize)
-	nodes[0], err = CreateNode(0, nil, conf)
-	for i := 1; i < conf.ClusterSize; i++ {
-		nodes[i], err = CreateNode(0, nodes[0].GetLocalAddr(), conf)
+
+	nodes := make([]*RaftNode, config.ClusterSize)
+
+	nodes[0], err = CreateNode(0, nil, config)
+	for i := 1; i < config.ClusterSize; i++ {
+		nodes[i], err = CreateNode(0, nodes[0].GetLocalAddr(), config)
 		if err != nil {
 			return nil, err
 		}
@@ -175,15 +192,35 @@ func CreateCluster(conf *Config) ([] *RaftNode, error) {
 	return nodes, nil
 }
 
-func (r *RaftNode) run() {
-	curr := r.doFollower()
-	for curr != nil {
-		curr = curr()
-	}
+
+
+func AddrToId(addr string, length int) string {
+	h := sha1.New()
+	h.Write([]byte(addr))
+	v := h.Sum(nil)
+	keyInt := big.Int{}
+	keyInt.SetBytes(v[:length])
+	return keyInt.String()
+}
+
+func (r *RaftNode) Exit() {
+	Out.Printf("Abruptly shutting down node!")
+	os.Exit(0)
 }
 
 func (r *RaftNode) GracefulExit() {
 	r.Testing.PauseWorld(true)
 	Out.Println("gracefully shutting down the node %v", r.Id)
 	r.gracefulExit <- true
+}
+
+func (r *RaftNode) GetConfig() *Config {
+	return r.conf
+}
+
+func (r *RaftNode) run() {
+	curr := r.doFollower
+	for curr != nil {
+		curr = curr()
+	}
 }
