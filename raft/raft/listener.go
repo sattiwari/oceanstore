@@ -13,9 +13,9 @@ import (
 const LOW_PORT int = 32768
 const HIGH_PORT int = 61000
 
-func OpenListener() (net.Listener, uint64, error) {
+func OpenListener() (net.Listener, int, error) {
 	rand.Seed(time.Now().UTC().UnixNano())
-	port := uint64(rand.Intn(HIGH_PORT - LOW_PORT) + LOW_PORT)
+	port := rand.Intn(HIGH_PORT - LOW_PORT) + LOW_PORT
 	conn, err := OpenPort(port)
 	if err != nil {
 		if addrInUse(err) {
@@ -37,7 +37,7 @@ func addrInUse(err error) bool {
 	return false
 }
 
-func OpenPort(port uint64) (net.Listener, error) {
+func OpenPort(port int) (net.Listener, error) {
 	hostname, err := os.Hostname()
 	if err != nil {
 		return nil, err
