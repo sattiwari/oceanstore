@@ -1,6 +1,8 @@
 package raft
 
-import "net/rpc"
+import (
+	"net/rpc"
+)
 
 type RaftRPCServer struct {
 	node *RaftNode
@@ -43,6 +45,7 @@ func (server *RaftRPCServer) RequestVoteImpl(request *RequestVoteRequest, reply 
 	if server.node.Testing.IsDenied(request.CandidateId, *server.node.GetLocalAddr()) {
 		return ErrorTestingPolicyDenied
 	}
+	server.node.Out("zzz")
 	rvReply, err := server.node.RequestVote(request)
 	*reply = rvReply
 	return err

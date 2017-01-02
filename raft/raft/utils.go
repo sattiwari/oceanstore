@@ -33,6 +33,8 @@ func makeRemoteCall(remoteNode *NodeAddr, method string, req interface{}, resp i
 	methodPath := fmt.Sprintf("%v.%v", remoteAddStr, method)
 	err = client.Call(methodPath, req, resp)
 	if err != nil {
+		client.Close()
+		delete(connectionMap, remoteAddStr)
 		return err
 	}
 	return nil

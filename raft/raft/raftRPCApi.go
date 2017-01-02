@@ -63,8 +63,11 @@ type RequestVoteReply struct {
 }
 
 func (r *RaftNode) RequestVoteRPC(remoteNode *NodeAddr, request RequestVoteRequest) (*RequestVoteReply, error) {
+	if r.Testing.IsDenied(*r.GetLocalAddr(), *remoteNode) {
+		return nil, ErrorTestingPolicyDenied
+	}
 	var reply RequestVoteReply
-	err := makeRemoteCall(remoteNode, "RequestVoteImpl", request, reply)
+	err := makeRemoteCall(remoteNode, "RequestVoteImpl", request, &reply)
 	if err != nil {
 		return nil, err
 	}

@@ -24,7 +24,6 @@ func (r *RaftNode) doFollower() state {
 				return nil
 			}
 
-		//	response to candidate request for votes
 		case vote := <-r.requestVote:
 			r.Out("Request vote received")
 			req := vote.request
@@ -37,13 +36,11 @@ func (r *RaftNode) doFollower() state {
 				r.LeaderAddress = nil
 				electionTimeout = makeElectionTimeout()
 			} else {
-				// Other candidate has a less up to date log.
 				if req.Term > currTerm {
 					r.setCurrentTerm(req.Term)
 				}
 			}
 
-		//	response for leader's heartbeat message
 		case appendEnt := <-r.appendEntries:
 			req := appendEnt.request
 			rep := appendEnt.reply
@@ -96,7 +93,6 @@ func (r *RaftNode) doFollower() state {
 			}
 			electionTimeout = makeElectionTimeout()
 
-		//	if a client contacts a follower, the follower redirects it to the leader
 		case regClient := <-r.registerClient:
 			rep := regClient.reply
 			if r.LeaderAddress != nil {
@@ -188,6 +184,7 @@ func (r *RaftNode) doCandidate() state {
 		case regClient := <-r.registerClient:
 			rep := regClient.reply
 			rep <- RegisterClientReply{ELECTION_IN_PROGRESS, 0, NodeAddr{"", ""}}
+
 		case clientReq := <-r.clientRequest:
 			rep := clientReq.reply
 			rep <- ClientReply{ELECTION_IN_PROGRESS, "Not leader", NodeAddr{"", ""}}
@@ -405,7 +402,7 @@ func (r *RaftNode) requestVotes(electionResults chan bool) {
 			if node.Id == r.Id {
 				continue
 			}
-			request := RequestVoteRequest{r.GetCurrentTerm(), *r.GetLocalAddr(), r.getLastLogIndex(), r.getLogTerm(r.commitIndex), r.GetLastLogIndex() }
+			request := RequestVoteRequest{r.GetCurrentTerm(), *r.GetLocalAddr(), r.commitIndex, r.getLogTerm(r.commitIndex), r.GetLastLogIndex() }
 			reply, _ := r.RequestVoteRPC(&node, request)
 			if reply == nil {
 				continue
