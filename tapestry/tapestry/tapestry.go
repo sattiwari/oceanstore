@@ -160,6 +160,10 @@ func (tapestry *Tapestry) Kill() {
 	tapestry.server.listener.Close()
 }
 
+func (tapestry *Tapestry) GetLocalAddr() string {
+	return tapestry.local.node.Address
+}
+
 // Prints a routing table
 func (tapestry *Tapestry) PrintRoutingTable() {
 	table := tapestry.local.table
