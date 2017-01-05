@@ -3,6 +3,7 @@ package oceanstore
 import (
 	"../../raft/raft"
 	"../../tapestry/tapestry"
+	"fmt"
 )
 
 const TAPESTRY_NODES = 3
@@ -50,6 +51,22 @@ func Start() (p *OceanNode, err error) {
 	ocean.rnodes, err = raft.CreateLocalCluster(raft.DefaultConfig())
 	if err != nil {
 		panic(err)
+	}
+
+	// RPC server --------------------------------------
+	ocean.server = newOceanstoreRPCServer(p)
+	ocean.Local = OceanAddr{ocean.server.listener.Addr().String()}
+	// -------------------------------------------------
+
+	// Create ocean raft client. Persist until raft is settled
+	client, err := CreateClient(ocean.Local)
+	for err != nil {
+		client, err = CreateClient(ocean.Local)
+	}
+
+	ocean.raftClient = ocean.clients[client.Id]
+	if ocean.raftClient == nil {
+		panic("Could not retrieve puddle raft client.")
 	}
 
 	return
