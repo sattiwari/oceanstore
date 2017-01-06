@@ -1,5 +1,12 @@
 package oceanstore
 
+import (
+	"strconv"
+	"strings"
+	"../../tapestry/tapestry"
+	"math/rand"
+)
+
 func removeExcessSlashes(path string) string {
 	var firstNonSlash, lastNonSlash, start int
 
@@ -60,4 +67,17 @@ func removeExcessSlashes(path string) string {
 	}
 
 	return str
+}
+
+func hashToGuid(id tapestry.ID) Guid {
+	s := ""
+	for i := 0; i < tapestry.DIGITS; i++ {
+		s += strconv.FormatUint(uint64(byte(id[i])), tapestry.BASE)
+	}
+	return Guid(strings.ToUpper(s))
+}
+
+func (puddle *OceanNode) getRandomTapestryNode() tapestry.Node {
+	index := rand.Int() % TAPESTRY_NODES
+	return puddle.tnodes[index].GetLocalAddr()
 }
