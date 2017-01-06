@@ -13,6 +13,10 @@ type OceanAddr struct {
 	Addr string
 }
 
+type Vguid string
+type Aguid string
+type Guid string
+
 type OceanNode struct {
 	tnodes      []*tapestry.Tapestry
 	rnodes      []*raft.RaftNode
@@ -69,5 +73,19 @@ func Start() (p *OceanNode, err error) {
 		panic("Could not retrieve puddle raft client.")
 	}
 
+	// Create the root node ----------------------------
+	_, err = ocean.mkdir(&MkdirRequest{ocean.raftClient.Id, "/"})
+	if err != nil {
+		panic("Could not create root node")
+	}
+
 	return
+}
+
+func (ocean *OceanNode) getCurrentDir(id uint64) string {
+	curdir, ok := ocean.clientPaths[id]
+	if !ok {
+		panic("Did not found the current path of a client that is supposed to be registered")
+	}
+	return curdir
 }
