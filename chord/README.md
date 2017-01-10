@@ -25,5 +25,7 @@ To locate the node at which a particular key-value pair is stored, we need to fi
 When node A services a request to find the successor of the key k, it first determines whether its own successor is the owner of k (the successor is simply entry 0 in the finger table). If it is, then A returns its successor in response to the request. Otherwise, node A finds node B in its finger table such that B has the largest hash smaller than the hash of k, and forwards the request to B.
 
 # Dynamics
+Chord supports the dynamic addition and removal of nodes from the network. Each node calls [stabilize](chord/node_local_impl.go#L32) and [fixNextFinger](chord/finger.go#L34) functions periodically to determine the successor and predecessor relationship between nodes as they are added to the network.
 
 # Future Work
+Support fault tolerance by maintaining a list of successors. This would need the keys to be replicated across a number of nodes. 
