@@ -3,6 +3,20 @@
 Tapestry is a distributed object location are retrieval (DOLR) system. Its design is motivated from <a href="http://www.srhea.net/papers/tapestry_jsac.pdf">Tapestry: A Resilient Global-Scale Overlay for
 Service Deployment</a> paper. It is an overlay network that implements simple key based routing.
 
+# Usage Example
+[cli](cli.go) serves as a console for interacting with chord, creating nodes and querying state on the local nodes. It provides the following commands:
+table- Print this node’s routing table
+* <b>backpointers</b> Print this node’s backpointers
+* <b>objects</b> Print the object replicas stored on this node
+* <b>put</b> Stores the provided key-value pair on the local node and advertises the key to the tapestry
+* <b>lookup</b> Looks up the specified key in the tapestry and prints its location
+* <b>get</b> Looks up the specified key in the tapestry, then fetches the value from one of the returned replicas
+* <b>remove</b> Remove the value stored locally for the provided key and stops advertising the key to the tapestry
+* <b>list</b> List the keys currently being advertised by the local node 
+* <b>leave</b> Instructs the local node to gracefully leave the Tapestry
+* <b>kill</b> Leaves the tapestry without graceful exit
+* <b>exit</b> Quit the CLI
+
 # Identifying Nodes and Objects
 Nodes and objects in the Tapestry network are each assigned a sequence of n base-16 digits globally unique identifier. 
 
@@ -37,9 +51,23 @@ If the new node has a shared prefix of length n with its root, then any other no
 Once the multicast has completed, the root node returns the list of need-to-know nodes to the new node. The new node uses this list as an initial neighbor set to populate its routing table. The node iteratively contacts the nodes, asking for their backpointers.
 
 # Graceful Exit
+Tapestry is extremely fault tolerant, so a node could leave without notifying any other nodes. However, a node can gracefully exit the Tapestry, too. When a node gracefully exits, it notifies all of the nodes in its backpointer table of the leave. As part of this notification, it consults its own routing table to find a suitable replacement for the other node’s routing table.
 
 # Fault Tolerance
-* Errors while routing
-* Loss of Root Node
-* Loss of replicas
-* Miscellaneous
+Following mechanisms ensure that there is no single point of failure in the system:
+
+* <b> Errors While Routing </b>
+When routing towards a surrogate node, it is possible that a communication failure with any of the intermediate nodes could impede the search. For this reason, routing tables store lists of nodes rather than a single node at each slot. If a failed node is encountered, the node that is searching can request that the failed node be removed from any routing tables it encounters, and resume its search at the last node it communicated with successfully. If the last node it communicated with successfully is no longer responding, it should communicate with the last successful node before that.
+
+* <b>Loss of Root Node</b>
+Published objects continually republish themselves at regular intervals. This ensures that if a surrogate node goes down, a new surrogate node will eventually take its place. 
+
+* <b>Loss of replicas</b>
+Finally, applications built on top of Tapestry might wish to ensure that an object remains available at all times, even if the node that published it fails.
+Multiple tapestry nodes can publish the same object. This means that client applications can learn of multiple locations of the object, so if the object becomes unavailable in one of these locations, the client can simply contact another of the nodes. This ensures that an object remains available at all times, even if the node that published it fails.
+
+* <b>Miscellaneous</b>
+The cases listed above are the common issues which can arise due to network errors. There are other more obscure ways in which surrogates may become unreachable for a short time when nodes join or fail in a certain order. Tapestry’s method for dealing with this is to assume that there are enough seeded hash values for a given object that not all seeds will become unreachable due to such errors, and those which do become unreachable will be corrected when the replica performs its periodic republishing.
+
+# Future Work
+Reduce the number of hops in object lookups. This can be done by caching the nodes encountered along the path to the surrogate node when the location of an object is published to the its surrogate node.
