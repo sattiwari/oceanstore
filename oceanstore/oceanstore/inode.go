@@ -75,3 +75,18 @@ func (ocean *OceanNode) getTapestryData(aguid Aguid, id uint64) ([]byte, error) 
 	}
 	return data, nil
 }
+
+// Gets the inode that has a given aguid
+func (puddle *PuddleNode) getInodeFromAguid(aguid Aguid, id uint64) (*Inode, error) {
+	// Get the vguid using raft
+	bytes, err := puddle.getTapestryData(aguid, id)
+
+	inode := new(Inode)
+	err = inode.GobDecode(bytes)
+	if err != nil {
+		fmt.Println(bytes)
+		return nil, err
+	}
+
+	return inode, nil
+}
