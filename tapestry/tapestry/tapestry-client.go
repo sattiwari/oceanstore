@@ -29,3 +29,10 @@ func TapestryGet(remote Node, key string) ([]byte, error) {
 	return nil, fmt.Errorf("Error contacting replicas, %v: %v", replicas, errs)
 }
 
+func TapestryRemove(remote Node, key string) (success bool, err error) {
+	fmt.Printf("Making remote TapestryRemove call\n")
+	var rsp RemoveResponse
+	err = makeRemoteNodeCall(remote, "TapestryRemove", RemoveRequest{remote, key}, &rsp)
+	success = rsp.Removed
+	return
+}
