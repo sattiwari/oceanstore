@@ -36,3 +36,50 @@ func TapestryRemove(remote Node, key string) (success bool, err error) {
 	success = rsp.Removed
 	return
 }
+
+type StoreRequest struct {
+	To    Node
+	Key   string
+	Value []byte
+}
+
+type StoreResponse struct {
+}
+
+type LookupRequest struct {
+	To  Node
+	Key string
+}
+
+type LookupResponse struct {
+	Nodes []Node
+}
+
+type RemoveRequest struct {
+	To  Node
+	Key string
+}
+
+type RemoveResponse struct {
+	Removed bool
+}
+
+// Server: extension method to open up Store via RPC
+func (server *TapestryRPCServer) TapestryStore(req StoreRequest, rsp *StoreResponse) (err error) {
+	fmt.Printf("Received remote invocation of Tapestry.Store\n")
+	return server.tapestry.Store(req.Key, req.Value)
+}
+
+// Server: extension method to open up Lookup via RPC
+func (server *TapestryRPCServer) TapestryLookup(req LookupRequest, rsp *LookupResponse) (err error) {
+	fmt.Printf("Received remote invocation of Tapestry.Lookup\n")
+	rsp.Nodes, err = server.tapestry.Lookup(req.Key)
+	return
+}
+
+// Server: extension method to open up Remove via RPC
+func (server *TapestryRPCServer) TapestryRemove(req RemoveRequest, rsp *RemoveResponse) (err error) {
+	fmt.Printf("Received remote invocation of Tapestry.Remove\n")
+	rsp.Removed = server.tapestry.Remove(req.Key)
+	return
+}
