@@ -2,6 +2,12 @@ package tapestry
 
 import "fmt"
 
+// Invoke tapestry.Store on a remote tapestry node
+func TapestryStore(remote Node, key string, value []byte) error {
+	fmt.Printf("Making remote TapestryStore call\n")
+	return makeRemoteNodeCall(remote, "TapestryStore", StoreRequest{remote, key, value}, &StoreResponse{})
+}
+
 // Invoke tapestry.Lookup on a remote tapestry node
 func TapestryLookup(remote Node, key string) (nodes []Node, err error) {
 	fmt.Printf("Making remote TapestryLookup call\n")
