@@ -2,6 +2,15 @@ package tapestry
 
 import "fmt"
 
+// Invoke tapestry.Lookup on a remote tapestry node
+func TapestryLookup(remote Node, key string) (nodes []Node, err error) {
+	fmt.Printf("Making remote TapestryLookup call\n")
+	var rsp LookupResponse
+	err = makeRemoteNodeCall(remote, "TapestryLookup", LookupRequest{remote, key}, &rsp)
+	nodes = rsp.Nodes
+	return
+}
+
 // Get data from a tapestry node.  Looks up key then fetches directly
 func TapestryGet(remote Node, key string) ([]byte, error) {
 	fmt.Printf("Making remote TapestryGet call\n")
