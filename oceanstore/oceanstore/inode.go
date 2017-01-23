@@ -119,3 +119,26 @@ func (ocean *OceanNode) storeInode(path string, inode *Inode, id uint64) error {
 
 	return nil
 }
+
+func (ocean *OceanNode) storeIndirectBlock(inodePath string, block []byte,
+id uint64) error {
+
+	blockPath := fmt.Sprintf("%v:%v", inodePath, "indirect")
+	hash := tapestry.Hash(blockPath)
+
+	aguid := Aguid(hashToGuid(hash))
+	vguid := Vguid(randSeq(tapestry.DIGITS))
+
+	// Set the new aguid -> vguid pair with raft
+	err := ocean.setRaftVguid(aguid, vguid, id)
+	if err != nil {
+		return err
+	}
+
+	err = tapestry.TapestryStore(ocean.getRandomTapestryNode(), string(vguid), block)
+	if err != nil {
+		return fmt.Errorf("Tapestry error")
+	}
+
+	return nil
+}
