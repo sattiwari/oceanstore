@@ -77,9 +77,9 @@ func (ocean *OceanNode) getTapestryData(aguid Aguid, id uint64) ([]byte, error) 
 }
 
 // Gets the inode that has a given aguid
-func (puddle *PuddleNode) getInodeFromAguid(aguid Aguid, id uint64) (*Inode, error) {
+func (ocean *OceanNode) getInodeFromAguid(aguid Aguid, id uint64) (*Inode, error) {
 	// Get the vguid using raft
-	bytes, err := puddle.getTapestryData(aguid, id)
+	bytes, err := ocean.getTapestryData(aguid, id)
 
 	inode := new(Inode)
 	err = inode.GobDecode(bytes)
@@ -89,4 +89,33 @@ func (puddle *PuddleNode) getInodeFromAguid(aguid Aguid, id uint64) (*Inode, err
 	}
 
 	return inode, nil
+}
+
+// Stores inode as data
+func (ocean *OceanNode) storeInode(path string, inode *Inode, id uint64) error {
+
+	hash := tapestry.Hash(path)
+
+	aguid := Aguid(hashToGuid(hash))
+	vguid := Vguid(randSeq(tapestry.DIGITS))
+
+	// Encode the inode
+	bytes, err := inode.GobEncode()
+	if err != nil {
+		return err
+	}
+
+	// Set the new aguid -> vguid pair with raft
+	err = ocean.setRaftVguid(aguid, vguid, id)
+	if err != nil {
+		return err
+	}
+
+	// Store data in tapestry with key: vguid
+	err = tapestry.TapestryStore(ocean.getRandomTapestryNode(), string(vguid), bytes)
+	if err != nil {
+		return err
+	}
+
+	return nil
 }
