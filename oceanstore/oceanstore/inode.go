@@ -37,6 +37,28 @@ func (ocean *OceanNode) getInode(path string, id uint64) (*Inode, error) {
 	return inode, nil
 }
 
+func (d *Inode) GobEncode() ([]byte, error) {
+	w := new(bytes.Buffer)
+	encoder := gob.NewEncoder(w)
+	err := encoder.Encode(d.name)
+	if err != nil {
+		return nil, err
+	}
+	err = encoder.Encode(d.filetype)
+	if err != nil {
+		return nil, err
+	}
+	err = encoder.Encode(d.size)
+	if err != nil {
+		return nil, err
+	}
+	err = encoder.Encode(d.indirect)
+	if err != nil {
+		return nil, err
+	}
+	return w.Bytes(), nil
+}
+
 func (d *Inode) GobDecode(buf []byte) error {
 	r := bytes.NewBuffer(buf)
 	decoder := gob.NewDecoder(r)
