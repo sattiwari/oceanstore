@@ -10,11 +10,46 @@ import (
 
 type Filetype int
 
+const (
+	DIR Filetype = iota
+	FILE
+)
+
+const BLOCK_SIZE = uint32(4096)
+
 type Inode struct {
 	name     string
 	filetype Filetype
 	size     uint32
 	indirect Guid
+}
+
+type Block struct {
+	bytes []byte
+}
+
+func CreateDirInode(name string) *Inode {
+	inode := new(Inode)
+	inode.name = name
+	inode.filetype = DIR
+	inode.size = 0
+	inode.indirect = ""
+	return inode
+}
+
+func CreateFileInode(name string) *Inode {
+	inode := new(Inode)
+	inode.name = name
+	inode.filetype = FILE
+	inode.size = 0
+	inode.indirect = ""
+	return inode
+}
+
+func CreateBlock() *Block {
+	block := new(Block)
+	block.bytes = make([]byte, BLOCK_SIZE)
+	return block
 }
 
 // Gets the inode that has a given path
