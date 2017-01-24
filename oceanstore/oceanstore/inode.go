@@ -113,6 +113,24 @@ func (ocean *OceanNode) getInodeFromAguid(aguid Aguid, id uint64) (*Inode, error
 	return inode, nil
 }
 
+func (ocean *OceanNode) getFileBlock(key string, blockno uint32, id uint64) ([]byte, error) {
+	blockPath := fmt.Sprintf("%v:%v", key, blockno)
+	hash := tapestry.Hash(blockPath)
+	aguid := Aguid(hashToGuid(hash))
+
+	return ocean.getTapestryData(aguid, id)
+}
+
+// Gets the block of the inode of the specified key/path
+func (ocean *OceanNode) getInodeBlock(key string, id uint64) ([]byte, error) {
+	blockPath := fmt.Sprintf("%v:%v", key, "indirect")
+	hash := tapestry.Hash(blockPath)
+	aguid := Aguid(hashToGuid(hash))
+
+	return ocean.getTapestryData(aguid, id)
+}
+
+
 // Stores inode as data
 func (ocean *OceanNode) storeInode(path string, inode *Inode, id uint64) error {
 
