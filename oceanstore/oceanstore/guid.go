@@ -5,9 +5,9 @@ import (
 	"fmt"
 )
 
-func (puddle *OceanNode) getRaftVguid(aguid Aguid, id uint64) (Vguid, error) {
+func (ocean *OceanNode) getRaftVguid(aguid Aguid, id uint64) (Vguid, error) {
 	// Get the raft client struct
-	c, ok := puddle.clients[id]
+	c, ok := ocean.clients[id]
 	if !ok {
 		panic("Attempted to get client from id, but not found.")
 	}
@@ -21,4 +21,23 @@ func (puddle *OceanNode) getRaftVguid(aguid Aguid, id uint64) (Vguid, error) {
 	}
 
 	return Vguid(res.Response), nil
+}
+
+func (ocean *OceanNode) setRaftVguid(aguid Aguid, vguid Vguid, id uint64) error {
+	// Get the raft client struct
+	c, ok := ocean.clients[id]
+	if !ok {
+		panic("Attempted to get client from id, but not found.")
+	}
+
+	data := fmt.Sprintf("%v:%v", aguid, vguid)
+
+	res, err := c.SendRequestWithResponse(raft.SET, []byte(data))
+	if err != nil {
+		return err
+	}
+	if res.Status != raft.OK {
+		return fmt.Errorf("Could not get response from raft.")
+	}
+	return nil
 }

@@ -4,6 +4,7 @@ import (
 	"../../raft/raft"
 	"../../tapestry/tapestry"
 	"fmt"
+	"math/rand"
 )
 
 const TAPESTRY_NODES = 3
@@ -88,4 +89,13 @@ func (ocean *OceanNode) getCurrentDir(id uint64) string {
 		panic("Did not found the current path of a client that is supposed to be registered")
 	}
 	return curdir
+}
+
+func randSeq(n int) string {
+	var letters = []rune("0123456789abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ")
+	b := make([]rune, n)
+	for i := range b {
+		b[i] = letters[rand.Intn(len(letters))]
+	}
+	return string(b)
 }
