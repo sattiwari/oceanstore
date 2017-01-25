@@ -6,6 +6,7 @@ import (
 	"bytes"
 	"encoding/gob"
 	"strings"
+	"strconv"
 )
 
 type Filetype int
@@ -239,4 +240,51 @@ block []byte, id uint64) error {
 	}
 
 	return nil
+}
+
+// Removes an entry from a directory block. If it not the last entry,
+// It moves and replaces the last entry with the removing entry.
+func (ocean *OceanNode) removeEntryFromBlock(bytes []byte, vguid Vguid,
+size uint32, id uint64) error {
+
+	start, err := ocean.lookupInode(bytes, vguid, size, id)
+	if err != nil {
+		return err
+	}
+	if start == size-tapestry.DIGITS { // Last one
+		// MakeZeros(bytes, start)
+	} else {
+		for i := uint32(0); i < tapestry.DIGITS; i++ {
+			bytes[start+i] = bytes[size-tapestry.DIGITS+i]
+		}
+	}
+	return nil
+}
+
+// Get the inode that has a specific vuid from a directory block.
+func (puddle *OceanNode) lookupInode(block []byte, vguid Vguid,
+size uint32, id uint64) (uint32, error) {
+	length := size / tapestry.DIGITS
+	for i := uint32(0); i < length; i++ {
+		curAguid := ByteIntoAguid(block, i*tapestry.DIGITS)
+		res, err := puddle.getRaftVguid(curAguid, id)
+		curVguid := Vguid(strings.Split(string(res), ":")[1])
+		if err != nil {
+			return 0, err
+		}
+		if curVguid == vguid {
+			fmt.Println("Found:", curAguid, curVguid)
+			return i, nil
+		}
+	}
+
+	return 0, fmt.Errorf("Not found!")
+}
+
+func ByteIntoAguid(bytes []byte, start uint32) Aguid {
+	aguid := ""
+	for i := uint32(0); i < tapestry.DIGITS; i++ {
+		aguid += strconv.FormatUint(uint64(bytes[start+i]), tapestry.BASE)
+	}
+	return Aguid(strings.ToUpper(aguid))
 }
