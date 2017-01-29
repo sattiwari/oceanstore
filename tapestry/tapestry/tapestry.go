@@ -202,3 +202,7 @@ func (tapestry *Tapestry) PrintBlobStore() {
 		fmt.Println(k)
 	}
 }
+
+func (tapestry *Tapestry) GetLocalNode() Node {
+	return tapestry.local.node
+}

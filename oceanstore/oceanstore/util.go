@@ -77,9 +77,9 @@ func hashToGuid(id tapestry.ID) Guid {
 	return Guid(strings.ToUpper(s))
 }
 
-func (puddle *OceanNode) getRandomTapestryNode() tapestry.Node {
+func (ocean *OceanNode) getRandomTapestryNode() tapestry.Node {
 	index := rand.Int() % TAPESTRY_NODES
-	return puddle.tnodes[index].GetLocalAddr()
+	return ocean.tnodes[index].GetLocalNode()
 }
 
 // Puts the contents of the ID inside the given byte
@@ -88,4 +88,16 @@ func IdIntoByte(bytes []byte, id *tapestry.ID, start int) {
 	for i := 0; i < tapestry.DIGITS; i++ {
 		bytes[start+i] = byte(id[i])
 	}
+}
+
+// Helper function used in 'ls'
+func makeString(elements [FILES_PER_INODE + 2]string) string {
+	ret := ""
+	for _, s := range elements {
+		if s == "" {
+			break
+		}
+		ret += "\t" + s
+	}
+	return ret
 }

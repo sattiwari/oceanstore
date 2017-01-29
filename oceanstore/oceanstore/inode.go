@@ -17,6 +17,7 @@ const (
 )
 
 const BLOCK_SIZE = uint32(4096)
+const FILES_PER_INODE = 4
 
 type Inode struct {
 	name     string
