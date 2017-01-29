@@ -3,7 +3,6 @@ package oceanstore
 import (
 	"../../raft/raft"
 	"../../tapestry/tapestry"
-	"fmt"
 	"math/rand"
 )
 

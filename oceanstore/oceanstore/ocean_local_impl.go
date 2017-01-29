@@ -3,6 +3,7 @@ package oceanstore
 import (
 	"fmt"
 	"strings"
+	"../../tapestry/tapestry"
 )
 
 func (ocean *OceanNode) mkdir(req *MkdirRequest) (MkdirReply, error) {

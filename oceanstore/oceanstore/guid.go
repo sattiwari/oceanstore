@@ -41,3 +41,21 @@ func (ocean *OceanNode) setRaftVguid(aguid Aguid, vguid Vguid, id uint64) error 
 	}
 	return nil
 }
+
+func (ocean *OceanNode) removeRaftVguid(aguid Aguid, id uint64) error {
+	// Get the raft client struct
+	c, ok := ocean.clients[id]
+	if !ok {
+		panic("Attempted to get client from id, but not found.")
+	}
+
+	res, err := c.SendRequestWithResponse(raft.REMOVE, []byte(aguid))
+	if err != nil {
+		return err
+	}
+	if res.Status != raft.OK {
+		return fmt.Errorf("Could not get response from raft.")
+	}
+
+	return nil
+}

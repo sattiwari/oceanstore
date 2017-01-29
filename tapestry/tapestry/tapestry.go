@@ -13,7 +13,7 @@ import (
  * calls which get forwarded to the local node */
 
 const BASE = 16    // The base of a digit of an ID.  By default, a digit is base-16
-const DIGITS = 4   // The number of digits in an ID.  By default, an ID has 40 digits.
+const DIGITS = 40   // The number of digits in an ID.  By default, an ID has 40 digits.
 const RETRIES = 3  // The number of retries on failure. By default we have 3 retries
 const K = 10       // During neighbour traversal, trim the neighbourset to this size before fetching backpointers. By default this has a value of 10
 const SLOTSIZE = 3 // The each slot in the routing table should store this many nodes.  By default this is 3.
