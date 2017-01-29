@@ -37,3 +37,9 @@ func newOceanstoreRPCServer(ocean *OceanNode) (server *OceanRPCServer) {
 
 	return
 }
+
+func (server *OceanRPCServer) ConnectImpl(req *ConnectRequest, rep *ConnectReply) error {
+	rvreply, err := server.node.connect(req)
+	*rep = rvreply
+	return err
+}

@@ -98,3 +98,8 @@ func randSeq(n int) string {
 	}
 	return string(b)
 }
+
+func (puddle *OceanNode) getRandomRaftNode() *raft.RaftNode {
+	index := rand.Int() % RAFT_NODES
+	return puddle.rnodes[index]
+}

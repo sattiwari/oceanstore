@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"strings"
 	"../../tapestry/tapestry"
+	"../../raft/raft"
 )
 
 func (ocean *OceanNode) mkdir(req *MkdirRequest) (MkdirReply, error) {
@@ -153,4 +154,28 @@ func (ocean *OceanNode) getRootInode(id uint64) *Inode {
 		panic("Root inode not found!")
 	}
 	return inode
+}
+
+func (ocean *OceanNode) connect(req *ConnectRequest) (ConnectReply, error) {
+	reply := ConnectReply{}
+	// addr := req.FromNode.Addr
+	// raftNode := puddle.getRandomRaftNode()
+	// fromAddr := raft.NodeAddr{raft.AddrToId(addr, raftNode.GetConfig().NodeIdSize), addr}
+
+	raftAddr := ocean.getRandomRaftNode().GetLocalAddr()
+
+	client, err := raft.CreateClient(*raftAddr)
+	if err != nil {
+		fmt.Println(err)
+		return ConnectReply{false, 0}, err
+	}
+
+	// Clients that just started the connection should start in root node.
+	ocean.clientPaths[client.Id] = "/"
+	ocean.clients[client.Id] = client
+
+	reply.Ok = true
+	reply.Id = client.Id
+	fmt.Println("connect reply:", reply)
+	return reply, nil
 }
