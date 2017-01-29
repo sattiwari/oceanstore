@@ -101,3 +101,15 @@ func makeString(elements [FILES_PER_INODE + 2]string) string {
 	}
 	return ret
 }
+
+func AguidIntoByte(bytes []byte, aguid Aguid, start uint32) {
+	for i := uint32(0); i < tapestry.DIGITS; i++ {
+		bytes[start+i] = byte(aguid[i])
+	}
+}
+
+func MakeZeros(bytes []byte, start uint32) {
+	for i := uint32(0); i < tapestry.DIGITS; i++ {
+		bytes[start+i] = 0
+	}
+}
