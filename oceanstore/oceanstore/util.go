@@ -81,3 +81,11 @@ func (puddle *OceanNode) getRandomTapestryNode() tapestry.Node {
 	index := rand.Int() % TAPESTRY_NODES
 	return puddle.tnodes[index].GetLocalAddr()
 }
+
+// Puts the contents of the ID inside the given byte
+// Starting at 'start' position
+func IdIntoByte(bytes []byte, id *tapestry.ID, start int) {
+	for i := 0; i < tapestry.DIGITS; i++ {
+		bytes[start+i] = byte(id[i])
+	}
+}
