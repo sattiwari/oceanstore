@@ -38,14 +38,14 @@ func TestGobEncoding(t *testing.T) {
 }
 
 func TestInodeStorage(t *testing.T) {
-	puddle, err := Start()
+	ocean, err := Start()
 	if err != nil {
 		return
-		t.Errorf("Could not init puddlestore: %v", err)
+		t.Errorf("Could not init oceanstore: %v", err)
 	}
 	time.Sleep(time.Millisecond * 500)
 
-	client := puddle.raftClient
+	client := ocean.raftClient
 
 	inode := new(Inode)
 	inode.name = "Test inode"
@@ -59,23 +59,24 @@ func TestInodeStorage(t *testing.T) {
 	inode2.size = 66
 	inode2.indirect = "BEEF"
 
-	err = puddle.storeInode("/path/one", inode, client.Id)
+
+	err = ocean.storeInode("/path/one", inode, client.Id)
 	if err != nil {
 		t.Errorf("Error storing Inode: %v", err)
 		return
 	}
-	err = puddle.storeInode("/second/path", inode2, client.Id)
+	err = ocean.storeInode("/second/path", inode2, client.Id)
 	if err != nil {
 		t.Errorf("Error storing Inode2: %v", err)
 		return
 	}
 
-	sameInode, err := puddle.getInode("/path/one", client.Id)
+	sameInode, err := ocean.getInode("/path/one", client.Id)
 	if err != nil {
 		t.Errorf("Error geting Inode: %v", err)
 		return
 	}
-	sameInode2, err := puddle.getInode("/second/path", client.Id)
+	sameInode2, err := ocean.getInode("/second/path", client.Id)
 	if err != nil {
 		t.Errorf("Error geting Inode2: %v", err)
 		return

@@ -70,7 +70,7 @@ func Start() (p *OceanNode, err error) {
 
 	ocean.raftClient = ocean.clients[client.Id]
 	if ocean.raftClient == nil {
-		panic("Could not retrieve puddle raft client.")
+		panic("Could not retrieve ocean raft client.")
 	}
 
 	// Create the root node ----------------------------
